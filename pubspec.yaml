@@ -1,0 +1,42 @@
+name: github_wallpaper
+description: "Display your GitHub contributions as an auto-updating wallpaper"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+  flutter: ">=3.38.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State Management
+  provider: ^6.1.2
+  
+  # Storage
+  shared_preferences: ^2.3.3
+  path_provider: ^2.1.5
+  
+  # Networking
+  http: ^1.2.2
+  
+  # Background Tasks
+  workmanager: ^0.9.0+3
+  
+  # Wallpaper Setting
+  async_wallpaper: ^2.1.0
+  
+  # Utilities
+  intl: ^0.20.1
+  
+  # UI
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
