@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../core/constants.dart';
+import '../core/theme.dart';
 import '../core/date_utils.dart';
 import '../core/preferences.dart';
 import '../core/github_api.dart';
-import 'dashboard_screen.dart';
+import 'main_navigation.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({Key? key}) : super(key: key);
@@ -17,13 +17,11 @@ class _SetupScreenState extends State<SetupScreen> {
   final _tokenController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-  bool _isDarkMode = false;
 
   @override
   void initState() {
     super.initState();
     _loadSavedCredentials();
-    _isDarkMode = AppPreferences.getDarkMode();
   }
 
   Future<void> _loadSavedCredentials() async {
@@ -40,7 +38,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
     if (username.isEmpty || token.isEmpty) {
       setState(() {
-        _errorMessage = '❌ Please enter both username and token';
+        _errorMessage = 'Please enter both username and token';
       });
       return;
     }
@@ -60,224 +58,233 @@ class _SetupScreenState extends State<SetupScreen> {
       await AppPreferences.setCachedData(data);
       await AppPreferences.setLastUpdate(DateTime.now());
 
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                MainNavigation(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+            transitionDuration: AppTheme.durationNormal,
+          ),
         );
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = '❌ ${e.toString()}';
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = _isDarkMode
-        ? AppConstants.darkBackground
-        : AppConstants.lightBackground;
-
-    final surfaceColor = _isDarkMode
-        ? AppConstants.darkSurface
-        : AppConstants.lightSurface;
-
-    final textColor = _isDarkMode
-        ? AppConstants.darkTextPrimary
-        : AppConstants.lightTextPrimary;
-
-    final textSecondary = _isDarkMode
-        ? AppConstants.darkTextSecondary
-        : AppConstants.lightTextSecondary;
-
-    final successColor = _isDarkMode
-        ? AppConstants.darkSuccess
-        : AppConstants.lightSuccess;
-
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: context.backgroundColor,
       appBar: AppBar(
-        backgroundColor: surfaceColor,
-        title: Text('GitHub Wallpaper', style: TextStyle(color: textColor)),
+        title: Text('Setup'),
         actions: [
           IconButton(
             icon: Icon(
-              _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-              color: textColor,
+              context.theme.brightness == Brightness.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
             ),
             onPressed: () {
-              setState(() {
-                _isDarkMode = !_isDarkMode;
-                AppPreferences.setDarkMode(_isDarkMode);
-              });
+              final isDark = context.theme.brightness == Brightness.dark;
+              AppPreferences.setDarkMode(!isDark);
+              // Restart app to apply theme
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => SetupScreen()),
+              );
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildMonthInfoCard(surfaceColor, textColor, textSecondary),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: context.screenPadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(height: AppTheme.spacing8),
 
-            SizedBox(height: 24),
+              // Month Info Card
+              _buildMonthInfoCard(),
 
-            _buildTextField(
-              controller: _usernameController,
-              label: 'GitHub Username',
-              hint: 'e.g., AdelliRahulReddy',
-              icon: Icons.person,
-              surfaceColor: surfaceColor,
-              textColor: textColor,
-            ),
+              SizedBox(height: AppTheme.spacing24),
 
-            SizedBox(height: 16),
-
-            _buildTextField(
-              controller: _tokenController,
-              label: 'Personal Access Token',
-              hint: 'ghp_xxxxxxxxxxxx',
-              icon: Icons.key,
-              isPassword: true,
-              surfaceColor: surfaceColor,
-              textColor: textColor,
-            ),
-
-            SizedBox(height: 12),
-
-            _buildTokenInstructions(textSecondary),
-
-            SizedBox(height: 24),
-
-            ElevatedButton(
-              onPressed: _isLoading ? null : _syncData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: successColor,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              // Username Input
+              TextField(
+                controller: _usernameController,
+                style: context.textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  labelText: 'GitHub Username',
+                  hintText: 'e.g., AdelliRahulReddy',
+                  prefixIcon: Icon(Icons.person),
                 ),
               ),
-              child: _isLoading
-                  ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      '🔄 Sync GitHub Data',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+
+              SizedBox(height: AppTheme.spacing16),
+
+              // Token Input
+              TextField(
+                controller: _tokenController,
+                obscureText: true,
+                style: context.textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  labelText: 'Personal Access Token',
+                  hintText: 'ghp_xxxxxxxxxxxx',
+                  prefixIcon: Icon(Icons.key),
+                ),
+              ),
+
+              SizedBox(height: AppTheme.spacing12),
+
+              // Token Instructions
+              Container(
+                padding: EdgeInsets.all(AppTheme.spacing12),
+                decoration: BoxDecoration(
+                  color: context.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                  border: Border.all(
+                    color: context.primaryColor.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: context.primaryColor,
+                    ),
+                    SizedBox(width: AppTheme.spacing12),
+                    Expanded(
+                      child: Text(
+                        'Generate token at GitHub: Settings → Developer settings → Personal access tokens → Generate new token (classic). Select "read:user" scope.',
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colorScheme.onBackground.withOpacity(
+                            0.8,
+                          ),
+                        ),
                       ),
                     ),
-            ),
-
-            if (_errorMessage != null) ...[
-              SizedBox(height: 16),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red),
+                  ],
                 ),
               ),
-            ],
 
-            _buildLastSyncInfo(textSecondary),
+              SizedBox(height: AppTheme.spacing24),
+
+              // Sync Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _syncData,
+                  child: _isLoading
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text('🔄 Sync GitHub Data'),
+                ),
+              ),
+
+              // Error Message
+              if (_errorMessage != null) ...[
+                SizedBox(height: AppTheme.spacing16),
+                Container(
+                  padding: EdgeInsets.all(AppTheme.spacing12),
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    border: Border.all(
+                      color: context.colorScheme.error.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: context.colorScheme.error,
+                        size: 20,
+                      ),
+                      SizedBox(width: AppTheme.spacing12),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: context.textTheme.bodySmall?.copyWith(
+                            color: context.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Last Sync Info
+              _buildLastSyncInfo(),
+
+              SizedBox(height: AppTheme.spacing24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonthInfoCard() {
+    final monthName = AppDateUtils.getCurrentMonthName();
+    final year = DateTime.now().year;
+    final daysInMonth = AppDateUtils.getDaysInCurrentMonth();
+    final currentDay = AppDateUtils.getCurrentDayOfMonth();
+
+    return Card(
+      child: Container(
+        padding: EdgeInsets.all(AppTheme.spacing20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: context.theme.brightness == Brightness.dark
+                ? [Color(0xFF1F2937), Color(0xFF111827)]
+                : [Color(0xFFF3F4F6), Color(0xFFE5E7EB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '$monthName $year',
+              style: context.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: AppTheme.spacing8),
+            Text(
+              '$daysInMonth days • Day $currentDay',
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMonthInfoCard(
-    Color surfaceColor,
-    Color textColor,
-    Color textSecondary,
-  ) {
-    final monthName = AppDateUtils.getCurrentMonthName();
-    final year = DateTime.now().year;
-    final daysInMonth = AppDateUtils.getDaysInCurrentMonth();
-    final currentDay = AppDateUtils.getCurrentDayOfMonth();
-
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            '$monthName $year',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            '$daysInMonth days • Day $currentDay',
-            style: TextStyle(color: textSecondary, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    required Color surfaceColor,
-    required Color textColor,
-    bool isPassword = false,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      style: TextStyle(color: textColor),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: textColor.withOpacity(0.7)),
-        filled: true,
-        fillColor: surfaceColor,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTokenInstructions(Color textSecondary) {
-    return Text(
-      'ℹ️ Generate token at: Settings → Developer settings → Personal access tokens → Generate new token (classic). Select "read:user" scope.',
-      style: TextStyle(color: textSecondary, fontSize: 12),
-    );
-  }
-
-  Widget _buildLastSyncInfo(Color textSecondary) {
+  Widget _buildLastSyncInfo() {
     final lastUpdate = AppPreferences.getLastUpdate();
 
     if (lastUpdate == null) return SizedBox.shrink();
@@ -285,11 +292,20 @@ class _SetupScreenState extends State<SetupScreen> {
     final formattedDate = AppDateUtils.formatDateTime(lastUpdate);
 
     return Padding(
-      padding: EdgeInsets.only(top: 24),
-      child: Text(
-        '✅ Last synced: $formattedDate',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: textSecondary, fontSize: 12),
+      padding: EdgeInsets.only(top: AppTheme.spacing24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 16),
+          SizedBox(width: AppTheme.spacing8),
+          Flexible(
+            child: Text(
+              'Last synced: $formattedDate',
+              textAlign: TextAlign.center,
+              style: context.textTheme.bodySmall,
+            ),
+          ),
+        ],
       ),
     );
   }

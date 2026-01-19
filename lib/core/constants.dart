@@ -45,16 +45,16 @@ class AppConstants {
   static const double boxRadius = 2.0;
   static const double todayBorderWidth = 2.0;
 
-  // Default Positions
-  static const double defaultVerticalPosition = 0.36;
+  // Default Positions - CENTERED
+  static const double defaultVerticalPosition = 0.5;
   static const double defaultHorizontalPosition = 0.5;
   static const double defaultScale = 1.0;
 
-  // Slider Ranges
-  static const double minVerticalPos = 0.2;
-  static const double maxVerticalPos = 0.7;
-  static const double minScale = 0.7;
-  static const double maxScale = 1.3;
+  // Slider Ranges - FULL CONTROL
+  static const double minVerticalPos = 0.0;
+  static const double maxVerticalPos = 1.0;
+  static const double minScale = 0.5;
+  static const double maxScale = 2.0;
 
   // WorkManager
   static const String wallpaperTaskName = 'github-wallpaper-update';

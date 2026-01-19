@@ -1,95 +1,79 @@
+import 'package:intl/intl.dart';
+
 class AppDateUtils {
-  // Get current date in YYYY-MM-DD format
-  static String getCurrentDate() {
-    final now = DateTime.now();
-    return '${now.year}-${_padZero(now.month)}-${_padZero(now.day)}';
-  }
-
-  // Get current month start date (YYYY-MM-DDTHH:MM:SSZ format for API)
-  static String getCurrentMonthStart() {
-    final now = DateTime.now();
-    return '${now.year}-${_padZero(now.month)}-01T00:00:00Z';
-  }
-
-  // Get current month end date
-  static String getCurrentMonthEnd() {
-    final now = DateTime.now();
-    final lastDay = DateTime(now.year, now.month + 1, 0).day;
-    return '${now.year}-${_padZero(now.month)}-${_padZero(lastDay)}T23:59:59Z';
-  }
-
-  // Get year range for API (full year needed, we'll filter after)
-  static String getYearStart() {
-    final now = DateTime.now();
-    return '${now.year}-01-01T00:00:00Z';
-  }
-
-  static String getYearEnd() {
-    final now = DateTime.now();
-    return '${now.year}-12-31T23:59:59Z';
-  }
-
-  // Get current month name
   static String getCurrentMonthName() {
-    final months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return months[DateTime.now().month - 1];
+    return DateFormat('MMMM').format(DateTime.now());
   }
 
-  // Get days in current month
-  static int getDaysInCurrentMonth() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month + 1, 0).day;
-  }
-
-  // Get current day of month
   static int getCurrentDayOfMonth() {
     return DateTime.now().day;
   }
 
-  // Check if date is in current month
-  static bool isInCurrentMonth(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      return date.year == now.year && date.month == now.month;
-    } catch (e) {
-      return false;
-    }
+  static int getDaysInCurrentMonth() {
+    final now = DateTime.now();
+    final nextMonth = DateTime(now.year, now.month + 1, 1);
+    final lastDayOfMonth = nextMonth.subtract(Duration(days: 1));
+    return lastDayOfMonth.day;
   }
 
-  // Check if date is today
-  static bool isToday(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      return date.year == now.year &&
-          date.month == now.month &&
-          date.day == now.day;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Helper: Pad single digit with zero
-  static String _padZero(int value) {
-    return value.toString().padLeft(2, '0');
-  }
-
-  // Format DateTime for display
   static String formatDateTime(DateTime dateTime) {
-    return '${getCurrentMonthName()} ${dateTime.day}, ${dateTime.year} at ${_padZero(dateTime.hour)}:${_padZero(dateTime.minute)}';
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return DateFormat('MMM d, y').format(dateTime);
+    }
+  }
+
+  static String getDayName(DateTime date) {
+    return DateFormat('EEEE').format(date);
+  }
+
+  static DateTime getStartOfMonth() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, 1);
+  }
+
+  static DateTime getEndOfMonth() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month + 1, 0);
+  }
+
+  static DateTime getYearStart() {
+    final now = DateTime.now();
+    return DateTime(now.year, 1, 1);
+  }
+
+  static DateTime getYearEnd() {
+    final now = DateTime.now();
+    return DateTime(now.year, 12, 31);
+  }
+
+  static bool isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  static bool isInCurrentMonth(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month;
+  }
+
+  static String formatDate(DateTime date) {
+    return DateFormat('yyyy-MM-dd').format(date);
+  }
+
+  static DateTime parseDate(String dateString) {
+    return DateTime.parse(dateString);
   }
 }

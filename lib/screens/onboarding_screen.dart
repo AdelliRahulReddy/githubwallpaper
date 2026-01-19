@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/constants.dart';
+import '../core/theme.dart';
 import 'setup_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -39,36 +39,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDarkMode =
-        MediaQuery.of(context).platformBrightness == Brightness.dark;
-
-    final bgColor = isDarkMode
-        ? AppConstants.darkBackground
-        : AppConstants.lightBackground;
-
-    final textColor = isDarkMode
-        ? AppConstants.darkTextPrimary
-        : AppConstants.lightTextPrimary;
-
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: context.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             // Skip button
             Align(
               alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: _goToSetup,
-                child: Text(
-                  'Skip',
-                  style: TextStyle(
-                    color: isDarkMode
-                        ? AppConstants.darkTextSecondary
-                        : AppConstants.lightTextSecondary,
-                    fontSize: 16,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: AppTheme.spacing12,
+                  right: AppTheme.spacing16,
+                ),
+                child: TextButton(
+                  onPressed: _goToSetup,
+                  child: Text(
+                    'Skip',
+                    style: context.textTheme.bodyLarge?.copyWith(
+                      color: context.colorScheme.onBackground.withOpacity(0.6),
+                    ),
                   ),
                 ),
               ),
@@ -83,67 +73,72 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
                 itemCount: _pages.length,
                 itemBuilder: (context, index) {
-                  return _buildPage(_pages[index], screenWidth, isDarkMode);
+                  return _buildPage(_pages[index]);
                 },
               ),
             ),
 
             // Page indicators
-            _buildPageIndicator(),
-
-            SizedBox(height: screenHeight * 0.03),
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: AppTheme.spacing24),
+              child: _buildPageIndicator(),
+            ),
 
             // Bottom button
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _currentPage == _pages.length - 1
-                      ? _goToSetup
-                      : _nextPage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _pages[_currentPage].color,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              padding: context.screenPadding,
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _currentPage == _pages.length - 1
+                          ? _goToSetup
+                          : _nextPage,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _pages[_currentPage].color,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          vertical: AppTheme.spacing16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusMedium,
+                          ),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        _currentPage == _pages.length - 1
+                            ? 'Get Started'
+                            : 'Next',
+                        style: context.textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                    elevation: 0,
                   ),
-                  child: Text(
-                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                  SizedBox(height: AppTheme.spacing16),
+                ],
               ),
             ),
-
-            SizedBox(height: screenHeight * 0.04),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPage(OnboardingPage page, double screenWidth, bool isDarkMode) {
-    final textColor = isDarkMode
-        ? AppConstants.darkTextPrimary
-        : AppConstants.lightTextPrimary;
-
-    final textSecondary = isDarkMode
-        ? AppConstants.darkTextSecondary
-        : AppConstants.lightTextSecondary;
-
+  Widget _buildPage(OnboardingPage page) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: context.screenPadding.left),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Icon with gradient background
           Container(
-            width: screenWidth * 0.35,
-            height: screenWidth * 0.35,
+            width: context.screenWidth * 0.35,
+            height: context.screenWidth * 0.35,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -153,32 +148,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(32),
+              borderRadius: BorderRadius.circular(AppTheme.radiusRound),
             ),
-            child: Icon(page.icon, size: screenWidth * 0.18, color: page.color),
+            child: Icon(
+              page.icon,
+              size: context.screenWidth * 0.18,
+              color: page.color,
+            ),
           ),
 
-          SizedBox(height: 48),
+          SizedBox(height: AppTheme.spacing48),
 
           // Title
           Text(
             page.title,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
+            style: context.textTheme.displaySmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: textColor,
-              height: 1.2,
             ),
           ),
 
-          SizedBox(height: 16),
+          SizedBox(height: AppTheme.spacing16),
 
           // Description
-          Text(
-            page.description,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: textSecondary, height: 1.5),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+            child: Text(
+              page.description,
+              textAlign: TextAlign.center,
+              style: context.textTheme.bodyLarge?.copyWith(
+                color: context.colorScheme.onBackground.withOpacity(0.7),
+                height: 1.5,
+              ),
+            ),
           ),
         ],
       ),
@@ -191,15 +193,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: List.generate(
         _pages.length,
         (index) => AnimatedContainer(
-          duration: Duration(milliseconds: 300),
-          margin: EdgeInsets.symmetric(horizontal: 4),
+          duration: AppTheme.durationNormal,
+          margin: EdgeInsets.symmetric(horizontal: AppTheme.spacing4),
           width: _currentPage == index ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
             color: _currentPage == index
                 ? _pages[index].color
                 : _pages[index].color.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(AppTheme.spacing4),
           ),
         ),
       ),
@@ -208,7 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _nextPage() {
     _pageController.nextPage(
-      duration: Duration(milliseconds: 400),
+      duration: AppTheme.durationNormal,
       curve: Curves.easeInOut,
     );
   }
@@ -216,7 +218,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _goToSetup() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => SetupScreen()),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => SetupScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: AppTheme.durationNormal,
+      ),
     );
   }
 
