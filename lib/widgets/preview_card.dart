@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../models/contribution_data.dart';
-import '../../utils/constants.dart';
+import '../models/contribution_data.dart';
+import '../core/constants.dart';
 import 'heatmap_painter.dart';
 
 class PreviewCard extends StatelessWidget {
@@ -43,14 +43,14 @@ class PreviewCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: AspectRatio(
-          aspectRatio: 9 / 19.5, // Phone aspect ratio
+          aspectRatio: 9 / 19.5,
           child: CustomPaint(
             painter: HeatmapPainter(
               data: data!,
               isDarkMode: isDarkMode,
               verticalPosition: verticalPosition,
               horizontalPosition: horizontalPosition,
-              scale: scale * 0.5, // Scale down for preview
+              scale: scale * 0.5,
               customQuote: customQuote,
             ),
           ),

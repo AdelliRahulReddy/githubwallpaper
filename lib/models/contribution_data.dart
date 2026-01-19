@@ -1,4 +1,4 @@
-import '../utils/date_utils.dart';
+import '../core/date_utils.dart';
 
 class ContributionDay {
   final String date;
@@ -11,10 +11,8 @@ class ContributionDay {
     required this.contributionLevel,
   });
 
-  // Check if this day is today
   bool isToday() => AppDateUtils.isToday(date);
 
-  // Convert GitHub level string to 0-4 int
   int getLevelInt() {
     switch (contributionLevel) {
       case 'NONE':

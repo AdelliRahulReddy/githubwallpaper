@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/contribution_data.dart';
-import '../../utils/constants.dart';
-import '../../utils/date_utils.dart';
+import '../models/contribution_data.dart';
+import '../core/constants.dart';
+import '../core/date_utils.dart';
 
 class HeatmapPainter extends CustomPainter {
   final CachedContributionData data;
@@ -22,13 +22,8 @@ class HeatmapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Draw stats header
     _drawStatsHeader(canvas, size);
-
-    // Draw heatmap grid
     _drawHeatmap(canvas, size);
-
-    // Draw quote (if provided)
     if (customQuote.isNotEmpty) {
       _drawQuote(canvas, size);
     }
@@ -44,10 +39,8 @@ class HeatmapPainter extends CustomPainter {
     final totalContributions = data.totalContributions;
     final currentStreak = data.currentStreak;
 
-    // Calculate header position (10% from top)
     final headerY = size.height * 0.1;
 
-    // Month & Year
     final monthStyle = TextStyle(
       color: textColor,
       fontSize: 32 * scale,
@@ -64,7 +57,6 @@ class HeatmapPainter extends CustomPainter {
       Offset((size.width - monthPainter.width) / 2, headerY),
     );
 
-    // Stats row
     final statsY = headerY + monthPainter.height + 20;
     final statsStyle = TextStyle(
       color: isDarkMode
@@ -90,22 +82,18 @@ class HeatmapPainter extends CustomPainter {
     final boxSize = AppConstants.boxSize * scale;
     final spacing = AppConstants.boxSpacing * scale;
 
-    // Calculate total grid dimensions
     final maxDaysInWeek = 7;
     final totalWeeks = data.weeks.length;
 
     final gridWidth = totalWeeks * (boxSize + spacing);
     final gridHeight = maxDaysInWeek * (boxSize + spacing);
 
-    // Calculate starting position based on user preferences
     final startX = (size.width - gridWidth) * horizontalPosition;
     final startY = size.height * verticalPosition;
 
-    // Draw day labels (Mon, Wed, Fri)
     _drawDayLabels(canvas, startX, startY, boxSize, spacing);
 
-    // Draw contribution boxes
-    double currentX = startX + 40; // Offset for day labels
+    double currentX = startX + 40;
 
     for (var week in data.weeks) {
       double currentY = startY;
@@ -128,7 +116,7 @@ class HeatmapPainter extends CustomPainter {
     double spacing,
   ) {
     final labels = ['Mon', 'Wed', 'Fri'];
-    final indices = [0, 2, 4]; // Monday, Wednesday, Friday
+    final indices = [0, 2, 4];
 
     final labelStyle = TextStyle(
       color: isDarkMode
@@ -169,7 +157,6 @@ class HeatmapPainter extends CustomPainter {
 
     canvas.drawRRect(rect, paint);
 
-    // Highlight today with orange border
     if (day.isToday()) {
       final borderPaint = Paint()
         ..color = AppConstants.todayHighlight

@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
-import '../utils/constants.dart';
-import '../utils/date_utils.dart';
-import '../storage/preferences.dart';
-import '../storage/cache_manager.dart';
-import '../api/github_api.dart';
-import '../api/github_repository.dart';
-import 'customize_screen.dart';
+import '../core/constants.dart';
+import '../core/date_utils.dart';
+import '../core/preferences.dart';
+import '../core/github_api.dart';
+import 'dashboard_screen.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+class SetupScreen extends StatefulWidget {
+  const SetupScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<SetupScreen> createState() => _SetupScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _SetupScreenState extends State<SetupScreen> {
   final _usernameController = TextEditingController();
   final _tokenController = TextEditingController();
   bool _isLoading = false;
@@ -53,28 +51,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Save credentials
       await AppPreferences.setUsername(username);
       await AppPreferences.setToken(token);
 
-      // Fetch data
       final api = GitHubAPI(token: token);
-      final repository = GitHubRepository(api: api);
-      final data = await repository.getContributions(username);
+      final data = await api.fetchContributions(username);
 
-      // Save to cache
-      await CacheManager.saveCachedData(data);
+      await AppPreferences.setCachedData(data);
       await AppPreferences.setLastUpdate(DateTime.now());
 
       setState(() {
         _isLoading = false;
       });
 
-      // Navigate to customize screen
       if (mounted) {
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const CustomizeScreen()),
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
       }
     } catch (e) {
@@ -132,12 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Current month info card
             _buildMonthInfoCard(surfaceColor, textColor, textSecondary),
 
             SizedBox(height: 24),
 
-            // Username input
             _buildTextField(
               controller: _usernameController,
               label: 'GitHub Username',
@@ -149,7 +140,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
             SizedBox(height: 16),
 
-            // Token input
             _buildTextField(
               controller: _tokenController,
               label: 'Personal Access Token',
@@ -162,12 +152,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
             SizedBox(height: 12),
 
-            // Token instructions
             _buildTokenInstructions(textSecondary),
 
             SizedBox(height: 24),
 
-            // Sync button
             ElevatedButton(
               onPressed: _isLoading ? null : _syncData,
               style: ElevatedButton.styleFrom(
@@ -196,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
             ),
 
-            // Error message
             if (_errorMessage != null) ...[
               SizedBox(height: 16),
               Container(
@@ -213,7 +200,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
 
-            // Last sync info
             _buildLastSyncInfo(textSecondary),
           ],
         ),

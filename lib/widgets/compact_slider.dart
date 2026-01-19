@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/constants.dart';
+import '../core/constants.dart';
 
 class CompactSlider extends StatelessWidget {
   final String label;

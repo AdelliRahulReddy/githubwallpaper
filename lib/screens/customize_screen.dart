@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import '../utils/constants.dart';
-import '../storage/preferences.dart';
-import '../storage/cache_manager.dart';
-import '../services/wallpaper_service.dart';
-import '../services/background_worker.dart';
-import 'widgets/preview_card.dart';
-import 'widgets/compact_slider.dart';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:async_wallpaper/async_wallpaper.dart';
+import '../core/constants.dart';
+import '../core/preferences.dart';
+import '../widgets/preview_card.dart';
+import '../widgets/compact_slider.dart';
+import '../widgets/heatmap_painter.dart';
 
 class CustomizeScreen extends StatefulWidget {
   const CustomizeScreen({Key? key}) : super(key: key);
@@ -54,11 +57,25 @@ class _CustomizeScreenState extends State<CustomizeScreen>
 
     try {
       await _saveSettings();
-      final result = await WallpaperService.updateWallpaper();
+      final data = AppPreferences.getCachedData();
+
+      if (data == null) {
+        throw Exception('No cached data. Please sync first.');
+      }
+
+      final file = await _generateWallpaperImage(data);
+
+      await AsyncWallpaper.setWallpaperFromFile(
+        filePath: file.path,
+        wallpaperLocation: AsyncWallpaper.BOTH_SCREENS,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ $result'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('✅ Wallpaper set successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -73,6 +90,49 @@ class _CustomizeScreenState extends State<CustomizeScreen>
     } finally {
       setState(() => _isSettingWallpaper = false);
     }
+  }
+
+  Future<File> _generateWallpaperImage(data) async {
+    final size = Size(
+      AppConstants.wallpaperWidth.toDouble(),
+      AppConstants.wallpaperHeight.toDouble(),
+    );
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    final bgPaint = Paint()
+      ..color = _isDarkMode
+          ? AppConstants.darkBackground
+          : AppConstants.lightBackground;
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    final painter = HeatmapPainter(
+      data: data,
+      isDarkMode: _isDarkMode,
+      verticalPosition: _verticalPosition,
+      horizontalPosition: _horizontalPosition,
+      scale: _scale,
+      customQuote: _customQuote,
+    );
+
+    painter.paint(canvas, size);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(
+      size.width.toInt(),
+      size.height.toInt(),
+    );
+
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final pngBytes = byteData!.buffer.asUint8List();
+
+    final directory = await getApplicationDocumentsDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final file = File('${directory.path}/github_wallpaper_$timestamp.png');
+    await file.writeAsBytes(pngBytes);
+
+    return file;
   }
 
   Future<void> _resetSettings() async {
@@ -92,7 +152,7 @@ class _CustomizeScreenState extends State<CustomizeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final cachedData = CacheManager.getCachedData();
+    final cachedData = AppPreferences.getCachedData();
 
     final bgColor = _isDarkMode
         ? AppConstants.darkBackground
@@ -136,7 +196,6 @@ class _CustomizeScreenState extends State<CustomizeScreen>
       ),
       body: Column(
         children: [
-          // 70% Preview Area
           Expanded(
             flex: 7,
             child: Container(
@@ -152,7 +211,6 @@ class _CustomizeScreenState extends State<CustomizeScreen>
             ),
           ),
 
-          // 30% Controls Area
           Expanded(
             flex: 3,
             child: Container(
@@ -165,7 +223,6 @@ class _CustomizeScreenState extends State<CustomizeScreen>
               ),
               child: Column(
                 children: [
-                  // Tab Bar
                   Container(
                     margin: EdgeInsets.only(top: 16, left: 20, right: 20),
                     decoration: BoxDecoration(
@@ -190,15 +247,16 @@ class _CustomizeScreenState extends State<CustomizeScreen>
                     ),
                   ),
 
-                  // Tab Content
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
-                      children: [_buildPositionTab(), _buildQuoteTab()],
+                      children: [
+                        _buildPositionTab(),
+                        _buildQuoteTab(textColor, surfaceColor),
+                      ],
                     ),
                   ),
 
-                  // Action Buttons
                   _buildActionButtons(successColor, textColor),
                 ],
               ),
@@ -261,15 +319,7 @@ class _CustomizeScreenState extends State<CustomizeScreen>
     );
   }
 
-  Widget _buildQuoteTab() {
-    final textColor = _isDarkMode
-        ? AppConstants.darkTextPrimary
-        : AppConstants.lightTextPrimary;
-
-    final surfaceColor = _isDarkMode
-        ? AppConstants.darkBackground
-        : AppConstants.lightSurface;
-
+  Widget _buildQuoteTab(Color textColor, Color surfaceColor) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(20),
       child: Column(
@@ -295,7 +345,9 @@ class _CustomizeScreenState extends State<CustomizeScreen>
             decoration: InputDecoration(
               hintText: 'Enter a motivational quote...',
               filled: true,
-              fillColor: surfaceColor,
+              fillColor: _isDarkMode
+                  ? AppConstants.darkBackground
+                  : AppConstants.lightSurface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,

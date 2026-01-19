@@ -1,17 +1,15 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'constants.dart';
 import '../models/contribution_data.dart';
-import '../utils/constants.dart';
 
 class AppPreferences {
   static SharedPreferences? _prefs;
 
-  // Initialize SharedPreferences
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
   }
 
-  // Ensure initialized
   static SharedPreferences get _instance {
     if (_prefs == null) {
       throw Exception('AppPreferences not initialized. Call init() first.');
@@ -80,7 +78,29 @@ class AppPreferences {
     return _instance.getString(AppConstants.keyCustomQuote) ?? '';
   }
 
-  // Last Update Timestamp
+  // Cached Data
+  static Future<void> setCachedData(CachedContributionData data) async {
+    final jsonString = jsonEncode(data.toJson());
+    await _instance.setString(AppConstants.keyCachedData, jsonString);
+  }
+
+  static CachedContributionData? getCachedData() {
+    final jsonString = _instance.getString(AppConstants.keyCachedData);
+
+    if (jsonString == null || jsonString.isEmpty) {
+      return null;
+    }
+
+    try {
+      final jsonMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      return CachedContributionData.fromJson(jsonMap);
+    } catch (e) {
+      print('Error parsing cached data: $e');
+      return null;
+    }
+  }
+
+  // Last Update
   static Future<void> setLastUpdate(DateTime dateTime) async {
     await _instance.setString(
       AppConstants.keyLastUpdate,
@@ -93,7 +113,17 @@ class AppPreferences {
     return dateString != null ? DateTime.parse(dateString) : null;
   }
 
-  // Reset to defaults
+  // Check if cache is valid (< 4 hours old)
+  static bool isCacheValid() {
+    final cachedData = getCachedData();
+    if (cachedData == null) return false;
+
+    final now = DateTime.now();
+    final difference = now.difference(cachedData.lastUpdated);
+    return difference < AppConstants.updateInterval;
+  }
+
+  // Reset
   static Future<void> resetSettings() async {
     await setDarkMode(false);
     await setVerticalPosition(AppConstants.defaultVerticalPosition);
@@ -102,7 +132,6 @@ class AppPreferences {
     await setCustomQuote('');
   }
 
-  // Clear all data
   static Future<void> clearAll() async {
     await _instance.clear();
   }
