@@ -48,7 +48,7 @@ class AppConstants {
   // Default Positions - CENTERED
   static const double defaultVerticalPosition = 0.5;
   static const double defaultHorizontalPosition = 0.5;
-  static const double defaultScale = 1.0;
+  static const double defaultScale = 0.7;
 
   // Slider Ranges - FULL CONTROL
   static const double minVerticalPos = 0.0;

@@ -6,7 +6,10 @@ import '../core/github_api.dart';
 import 'main_navigation.dart';
 
 class SetupScreen extends StatefulWidget {
-  const SetupScreen({Key? key}) : super(key: key);
+  /// If true, user came from Settings and can go back
+  final bool canGoBack;
+  
+  const SetupScreen({Key? key, this.canGoBack = false}) : super(key: key);
 
   @override
   State<SetupScreen> createState() => _SetupScreenState();
@@ -61,18 +64,31 @@ class _SetupScreenState extends State<SetupScreen> {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                MainNavigation(),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  return FadeTransition(opacity: animation, child: child);
-                },
-            transitionDuration: AppTheme.durationNormal,
-          ),
-        );
+        if (widget.canGoBack) {
+          // User came from Settings, just go back with success
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Account updated successfully!'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          // First-time setup, go to main app
+          Navigator.pushReplacement(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  MainNavigation(),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+              transitionDuration: AppTheme.durationNormal,
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
@@ -87,7 +103,14 @@ class _SetupScreenState extends State<SetupScreen> {
     return Scaffold(
       backgroundColor: context.backgroundColor,
       appBar: AppBar(
-        title: Text('Setup'),
+        title: Text(widget.canGoBack ? 'Edit Account' : 'Setup'),
+        leading: widget.canGoBack
+            ? IconButton(
+                icon: Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+        automaticallyImplyLeading: widget.canGoBack,
         actions: [
           IconButton(
             icon: Icon(
@@ -98,10 +121,12 @@ class _SetupScreenState extends State<SetupScreen> {
             onPressed: () {
               final isDark = context.theme.brightness == Brightness.dark;
               AppPreferences.setDarkMode(!isDark);
-              // Restart app to apply theme
+              // Restart screen to apply theme
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => SetupScreen()),
+                MaterialPageRoute(
+                  builder: (context) => SetupScreen(canGoBack: widget.canGoBack),
+                ),
               );
             },
           ),
@@ -126,7 +151,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 style: context.textTheme.bodyLarge,
                 decoration: InputDecoration(
                   labelText: 'GitHub Username',
-                  hintText: 'e.g., AdelliRahulReddy',
+                  hintText: 'e.g., octocat',
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
@@ -182,7 +207,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
               SizedBox(height: AppTheme.spacing24),
 
-              // Sync Button
+              // Sync/Save Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -196,9 +221,21 @@ class _SetupScreenState extends State<SetupScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : Text('🔄 Sync GitHub Data'),
+                      : Text(widget.canGoBack ? '💾 Save & Sync' : '🔄 Sync GitHub Data'),
                 ),
               ),
+
+              // Cancel button (only when editing)
+              if (widget.canGoBack) ...[
+                SizedBox(height: AppTheme.spacing12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Cancel'),
+                  ),
+                ),
+              ],
 
               // Error Message
               if (_errorMessage != null) ...[

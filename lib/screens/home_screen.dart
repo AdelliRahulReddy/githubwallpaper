@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
-import '../core/date_utils.dart';
 import '../core/preferences.dart';
 import '../core/github_api.dart';
+import '../core/wallpaper_service.dart';
 import '../models/contribution_data.dart';
 import '../widgets/heatmap_painter.dart';
-import '../widgets/wallpaper_preview_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -22,6 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // Auto-refresh on app open
+    _autoRefreshOnOpen();
   }
 
   void _loadData() {
@@ -30,7 +31,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _refreshData() async {
+  /// Auto refresh when app opens (if last update > 1 hour ago)
+  Future<void> _autoRefreshOnOpen() async {
+    final lastUpdate = AppPreferences.getLastUpdate();
+    final now = DateTime.now();
+    
+    // Auto-refresh if: no data, or last update > 1 hour ago
+    if (_cachedData == null || 
+        lastUpdate == null || 
+        now.difference(lastUpdate).inHours >= 1) {
+      await _refreshData(showSnackbar: false);
+    }
+  }
+
+  Future<void> _refreshData({bool showSnackbar = true}) async {
+    if (_isRefreshing) return;
+    
     setState(() => _isRefreshing = true);
 
     try {
@@ -47,19 +63,23 @@ class _HomeScreenState extends State<HomeScreen> {
       await AppPreferences.setCachedData(data);
       await AppPreferences.setLastUpdate(DateTime.now());
 
+      // Also regenerate and set wallpaper automatically!
+      final target = AppPreferences.getWallpaperTarget();
+      await WallpaperService.generateAndSetWallpaper(data, target: target);
+
       _loadData();
 
-      if (mounted) {
+      if (mounted && showSnackbar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Data synced successfully!'),
+            content: Text('✅ Data synced & wallpaper updated!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && showSnackbar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ ${e.toString().replaceAll('Exception: ', '')}'),
@@ -69,7 +89,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } finally {
-      setState(() => _isRefreshing = false);
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
     }
   }
 
@@ -143,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SizedBox(width: AppTheme.spacing8),
           IconButton(
-            onPressed: _isRefreshing ? null : _refreshData,
+            onPressed: _isRefreshing ? null : () => _refreshData(),
             icon: _isRefreshing
                 ? SizedBox(
                     width: 20,
@@ -196,26 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppTheme.spacing24),
                 child: _cachedData == null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 48,
-                              color: context.colorScheme.onBackground.withOpacity(0.3),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              'No data available',
-                              style: TextStyle(
-                                color: context.colorScheme.onBackground.withOpacity(0.6),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
+                    ? _buildLoadingState()
                     : CustomPaint(
                         painter: HeatmapPainter(
                           data: _cachedData!,
@@ -242,11 +245,42 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (_isRefreshing) ...[
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Syncing...',
+              style: TextStyle(
+                color: context.colorScheme.onBackground.withOpacity(0.6),
+                fontSize: 14,
+              ),
+            ),
+          ] else ...[
+            Icon(
+              Icons.cloud_download_outlined,
+              size: 48,
+              color: context.colorScheme.onBackground.withOpacity(0.3),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Tap refresh to sync',
+              style: TextStyle(
+                color: context.colorScheme.onBackground.withOpacity(0.6),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickInfo() {
-    final monthName = AppDateUtils.getCurrentMonthName();
-    final year = DateTime.now().year;
-    final currentDay = AppDateUtils.getCurrentDayOfMonth();
-    final daysInMonth = AppDateUtils.getDaysInCurrentMonth();
     final lastUpdate = AppPreferences.getLastUpdate();
 
     return SingleChildScrollView(
@@ -254,67 +288,28 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Month Card
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(AppTheme.spacing16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: context.theme.brightness == Brightness.dark
-                    ? [Color(0xFF1F2937), Color(0xFF111827)]
-                    : [Color(0xFFF3F4F6), Color(0xFFE5E7EB)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$monthName $year',
-                      style: context.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: AppTheme.spacing4),
-                    Text(
-                      'Day $currentDay of $daysInMonth',
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        color: context.colorScheme.onBackground.withOpacity(
-                          0.7,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: EdgeInsets.all(AppTheme.spacing12),
-                  decoration: BoxDecoration(
-                    color: context.primaryColor.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$currentDay',
-                    style: context.textTheme.headlineSmall?.copyWith(
-                      color: context.primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           if (_cachedData != null) ...[
-            SizedBox(height: AppTheme.spacing12),
-
             // Quick Stats Row
             Row(
               children: [
+                Expanded(
+                  child: _buildQuickStatCard(
+                    icon: Icons.calendar_month_outlined,
+                    value: '${_cachedData!.totalContributions}',
+                    label: 'This Month',
+                    color: Color(0xFF39D353),
+                  ),
+                ),
+                SizedBox(width: AppTheme.spacing12),
+                Expanded(
+                  child: _buildQuickStatCard(
+                    icon: Icons.local_fire_department_outlined,
+                    value: '${_cachedData!.currentStreak}d',
+                    label: 'Streak',
+                    color: Color(0xFFFF9500),
+                  ),
+                ),
+                SizedBox(width: AppTheme.spacing12),
                 Expanded(
                   child: _buildQuickStatCard(
                     icon: Icons.commit_outlined,
@@ -323,36 +318,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Color(0xFF58A6FF),
                   ),
                 ),
-                SizedBox(width: AppTheme.spacing12),
-                Expanded(
-                  child: _buildQuickStatCard(
-                    icon: Icons.local_fire_department_outlined,
-                    value: '${_cachedData!.currentStreak}',
-                    label: 'Streak',
-                    color: Color(0xFFFF9500),
-                  ),
-                ),
               ],
             ),
           ],
 
           if (lastUpdate != null) ...[
-            SizedBox(height: AppTheme.spacing12),
+            SizedBox(height: AppTheme.spacing16),
 
-            // Last Update
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle_outline, color: Colors.green, size: 14),
-                SizedBox(width: AppTheme.spacing8),
-                Flexible(
-                  child: Text(
-                    'Synced ${AppDateUtils.formatDateTime(lastUpdate)}',
-                    style: context.textTheme.bodySmall,
-                    textAlign: TextAlign.center,
+            // Last Update & Auto-update status
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(AppTheme.spacing12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.autorenew, color: Colors.green, size: 16),
+                  SizedBox(width: AppTheme.spacing8),
+                  Text(
+                    'Auto-updates every 4 hours',
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: Colors.green,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ],
@@ -372,24 +366,21 @@ class _HomeScreenState extends State<HomeScreen> {
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(icon, color: color, size: 20),
-          SizedBox(width: AppTheme.spacing8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: context.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                Text(label, style: context.textTheme.bodySmall),
-              ],
+          Icon(icon, color: color, size: 24),
+          SizedBox(height: AppTheme.spacing4),
+          Text(
+            value,
+            style: context.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
+          ),
+          Text(
+            label,
+            style: context.textTheme.bodySmall,
+            textAlign: TextAlign.center,
           ),
         ],
       ),

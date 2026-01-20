@@ -274,16 +274,17 @@ class HeatmapPainter extends CustomPainter {
   }
 
   Color _getContributionColor(int contributions) {
+    // GitHub color scale: LIGHT green = few commits, DARK green = many commits
     if (contributions == 0) {
-      return isDarkMode ? Color(0xFF161B22) : Color(0xFFEBEDF0);
+      return isDarkMode ? Color(0xFF161B22) : Color(0xFFEBEDF0);  // Empty
     } else if (contributions <= 3) {
-      return Color(0xFF0E4429);
+      return Color(0xFF39D353);  // Level 1: LIGHT green (1-3 commits)
     } else if (contributions <= 6) {
-      return Color(0xFF006D32);
+      return Color(0xFF26A641);  // Level 2: Medium green (4-6 commits)
     } else if (contributions <= 9) {
-      return Color(0xFF26A641);
+      return Color(0xFF006D32);  // Level 3: Darker green (7-9 commits)
     } else {
-      return Color(0xFF39D353);
+      return Color(0xFF0E4429);  // Level 4: DARKEST green (10+ commits)
     }
   }
 

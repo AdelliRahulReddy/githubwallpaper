@@ -3,6 +3,7 @@ import 'package:workmanager/workmanager.dart';
 import '../core/theme.dart';
 import '../core/constants.dart';
 import '../core/preferences.dart';
+import '../main.dart';
 import 'setup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -19,10 +20,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSettings();
+  }
+
+  void _loadSettings() {
+    // Load persisted settings
+    _autoUpdateEnabled = AppPreferences.prefs.getBool('auto_update_enabled') ?? true;
+    _updateIntervalHours = AppPreferences.prefs.getInt('update_interval_hours') ?? 4;
+  }
+
+  Future<void> _saveSettings() async {
+    await AppPreferences.prefs.setBool('auto_update_enabled', _autoUpdateEnabled);
+    await AppPreferences.prefs.setInt('update_interval_hours', _updateIntervalHours);
   }
 
   Future<void> _toggleAutoUpdate(bool value) async {
     setState(() => _autoUpdateEnabled = value);
+    await _saveSettings();
 
     if (value) {
       await Workmanager().registerPeriodicTask(
@@ -30,12 +44,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         AppConstants.wallpaperTaskTag,
         frequency: Duration(hours: _updateIntervalHours),
         existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Auto-update enabled'),
+            content: Text('✅ Auto-update enabled (every $_updateIntervalHours hours)'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -56,21 +73,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _changeUpdateInterval(int hours) async {
     setState(() => _updateIntervalHours = hours);
+    await _saveSettings();
 
-    await Workmanager().registerPeriodicTask(
-      AppConstants.wallpaperTaskName,
-      AppConstants.wallpaperTaskTag,
-      frequency: Duration(hours: hours),
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('⏰ Update interval changed to $hours hours'),
-          behavior: SnackBarBehavior.floating,
+    if (_autoUpdateEnabled) {
+      await Workmanager().registerPeriodicTask(
+        AppConstants.wallpaperTaskName,
+        AppConstants.wallpaperTaskTag,
+        frequency: Duration(hours: hours),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
+        constraints: Constraints(
+          networkType: NetworkType.connected,
         ),
       );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⏰ Update interval changed to $hours hours'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -78,9 +101,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Clear Cache?'),
+        title: Text('Clear All Data?'),
         content: Text(
-          'This will remove all saved data. You\'ll need to sync again.',
+          'This will log you out and remove all settings. You\'ll need to set up the app again.',
         ),
         actions: [
           TextButton(
@@ -92,7 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextButton.styleFrom(
               foregroundColor: context.colorScheme.error,
             ),
-            child: Text('Clear'),
+            child: Text('Clear & Logout'),
           ),
         ],
       ),
@@ -111,12 +134,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _changeCredentials() async {
-    Navigator.pushAndRemoveUntil(
+  /// Navigate to edit account - user can come back!
+  Future<void> _editAccount() async {
+    final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => SetupScreen()),
-      (route) => false,
+      MaterialPageRoute(
+        builder: (context) => SetupScreen(canGoBack: true),
+      ),
     );
+
+    // If account was updated, refresh the UI
+    if (result == true && mounted) {
+      setState(() {}); // Refresh to show new username
+    }
   }
 
   @override
@@ -130,36 +160,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: context.screenPadding,
           children: [
-            // Appearance Section
-            _buildSectionHeader('Appearance'),
-            SizedBox(height: AppTheme.spacing12),
-            _buildSettingTile(
-              icon: Icons.dark_mode_outlined,
-              title: 'Dark Mode',
-              subtitle: isDarkMode ? 'Enabled' : 'Disabled',
-              trailing: Switch(
-                value: isDarkMode,
-                onChanged: (value) {
-                  AppPreferences.setDarkMode(value);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => SettingsScreen()),
-                  );
-                },
-                activeColor: context.primaryColor,
-              ),
-            ),
-
-            SizedBox(height: AppTheme.spacing24),
-
             // Auto-Update Section
-            _buildSectionHeader('Auto-Update'),
+            _buildSectionHeader('Wallpaper Updates'),
             SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.autorenew_outlined,
               title: 'Auto-Update Wallpaper',
               subtitle: _autoUpdateEnabled
-                  ? 'Every $_updateIntervalHours hours'
+                  ? 'Active - every $_updateIntervalHours hours'
                   : 'Disabled',
               trailing: Switch(
                 value: _autoUpdateEnabled,
@@ -175,10 +183,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             SizedBox(height: AppTheme.spacing12),
             _buildInfoCard(
-              icon: Icons.battery_charging_full_outlined,
-              title: 'Battery Optimization',
+              icon: Icons.info_outline,
+              title: 'How it works',
               subtitle:
-                  'Disable battery optimization for this app in system settings to ensure auto-updates work reliably.',
+                  'Your wallpaper automatically updates with the latest GitHub contributions every ${_updateIntervalHours} hours, even when the app is closed.',
+            ),
+
+            SizedBox(height: AppTheme.spacing24),
+
+            // Appearance Section
+            _buildSectionHeader('Appearance'),
+            SizedBox(height: AppTheme.spacing12),
+            _buildSettingTile(
+              icon: Icons.dark_mode_outlined,
+              title: 'Dark Mode',
+              subtitle: isDarkMode ? 'Enabled' : 'Disabled',
+              trailing: Switch(
+                value: isDarkMode,
+                onChanged: (value) async {
+                  await AppPreferences.setDarkMode(value);
+                  // Restart entire app to apply theme everywhere
+                  MyApp.restartApp(context);
+                },
+                activeColor: context.primaryColor,
+              ),
             ),
 
             SizedBox(height: AppTheme.spacing24),
@@ -188,14 +216,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.person_outline,
-              title: 'Change GitHub Account',
-              subtitle: AppPreferences.getUsername() ?? 'Not set',
+              title: 'GitHub Account',
+              subtitle: '@${AppPreferences.getUsername() ?? 'Not connected'}',
               trailing: Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: context.colorScheme.onBackground.withOpacity(0.5),
+                Icons.edit_outlined,
+                size: 20,
+                color: context.primaryColor,
               ),
-              onTap: _changeCredentials,
+              onTap: _editAccount,  // Now navigates properly with back support!
             ),
 
             SizedBox(height: AppTheme.spacing24),
@@ -205,8 +233,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.delete_outline,
-              title: 'Clear Cache',
-              subtitle: 'Remove all saved data',
+              title: 'Clear All Data & Logout',
+              subtitle: 'Remove everything and start fresh',
               trailing: Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
@@ -225,18 +253,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.info_outline,
               title: 'Version',
               subtitle: '1.0.0',
-            ),
-
-            SizedBox(height: AppTheme.spacing12),
-            _buildSettingTile(
-              icon: Icons.code_outlined,
-              title: 'GitHub Repository',
-              subtitle: 'View source code',
-              trailing: Icon(
-                Icons.open_in_new,
-                size: 16,
-                color: context.colorScheme.onBackground.withOpacity(0.5),
-              ),
             ),
 
             SizedBox(height: AppTheme.spacing40),
