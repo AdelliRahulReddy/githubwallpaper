@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../core/preferences.dart';
+import '../core/constants.dart';
 import '../core/github_api.dart';
 import '../core/wallpaper_service.dart';
 import '../models/contribution_data.dart';
@@ -21,70 +22,107 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
-    // Auto-refresh on app open
+    // ✅ IMPROVED: Auto-refresh on app open (smarter threshold)
     _autoRefreshOnOpen();
   }
 
   void _loadData() {
     setState(() {
-      _cachedData = AppPreferences.getCachedData();
+      try {
+        _cachedData = AppPreferences.getCachedData();
+      } catch (e) {
+        debugPrint('HomeScreen: Error loading cached data: $e');
+        _cachedData = null;
+      }
     });
   }
 
-  /// Auto refresh when app opens (if last update > 1 hour ago)
+  /// ✅ IMPROVED: Auto refresh when app opens (smart threshold)
+  /// Only refreshes if:
+  /// - No cached data exists, OR
+  /// - Last update was more than 6 hours ago (not too aggressive)
   Future<void> _autoRefreshOnOpen() async {
-    final lastUpdate = AppPreferences.getLastUpdate();
-    final now = DateTime.now();
-    
-    // Auto-refresh if: no data, or last update > 1 hour ago
-    if (_cachedData == null || 
-        lastUpdate == null || 
-        now.difference(lastUpdate).inHours >= 1) {
-      await _refreshData(showSnackbar: false);
+    try {
+      final lastUpdate = AppPreferences.getLastUpdate();
+      final now = DateTime.now();
+
+      // ✅ IMPROVED: 6-hour threshold instead of 1-hour (less aggressive)
+      if (_cachedData == null ||
+          lastUpdate == null ||
+          now.difference(lastUpdate).inHours >= 6) {
+        debugPrint(
+          'HomeScreen: Auto-refreshing data (last update: $lastUpdate)',
+        );
+        await _refreshData(showSnackbar: false);
+      } else {
+        debugPrint(
+          'HomeScreen: Using cached data (${now.difference(lastUpdate).inHours}h old)',
+        );
+      }
+    } catch (e) {
+      debugPrint('HomeScreen: Auto-refresh failed: $e');
     }
   }
 
   Future<void> _refreshData({bool showSnackbar = true}) async {
     if (_isRefreshing) return;
-    
+
     setState(() => _isRefreshing = true);
 
     try {
       final username = AppPreferences.getUsername();
       final token = AppPreferences.getToken();
 
-      if (username == null || token == null) {
-        throw Exception('Credentials not found');
+      if (username == null || username.isEmpty) {
+        throw Exception('GitHub username not configured');
       }
 
+      if (token == null || token.isEmpty) {
+        throw Exception('GitHub token not configured');
+      }
+
+      debugPrint('HomeScreen: Fetching contributions for $username');
       final api = GitHubAPI(token: token);
       final data = await api.fetchContributions(username);
 
+      // Save to cache
       await AppPreferences.setCachedData(data);
       await AppPreferences.setLastUpdate(DateTime.now());
 
-      // Also regenerate and set wallpaper automatically!
+      debugPrint('HomeScreen: Data synced successfully');
+
+      // ✅ FIXED: Regenerate and set wallpaper automatically
       final target = AppPreferences.getWallpaperTarget();
-      await WallpaperService.generateAndSetWallpaper(data, target: target);
+      final wallpaperSuccess = await WallpaperService.refreshAndSetWallpaper(
+        target: target,
+      );
 
       _loadData();
 
       if (mounted && showSnackbar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Data synced & wallpaper updated!'),
+            content: Text(
+              wallpaperSuccess
+                  ? '✅ Data synced & wallpaper updated!'
+                  : '✅ Data synced (wallpaper update skipped)',
+            ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      debugPrint('HomeScreen: Refresh error: $e');
+
       if (mounted && showSnackbar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -122,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: context.surfaceColor,
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(AppTheme.radiusRound),
                     topRight: Radius.circular(AppTheme.radiusRound),
                   ),
@@ -163,16 +201,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          SizedBox(width: AppTheme.spacing8),
+          const SizedBox(width: AppTheme.spacing8),
           IconButton(
             onPressed: _isRefreshing ? null : () => _refreshData(),
             icon: _isRefreshing
-                ? SizedBox(
+                ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Icon(Icons.refresh_outlined),
+                : const Icon(Icons.refresh_outlined),
             style: IconButton.styleFrom(
               backgroundColor: context.primaryColor.withOpacity(0.1),
               foregroundColor: context.primaryColor,
@@ -193,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: context.colorScheme.onBackground.withOpacity(0.6),
           ),
         ),
-        SizedBox(height: AppTheme.spacing12),
+        const SizedBox(height: AppTheme.spacing12),
 
         // Phone Mockup with Wallpaper
         Flexible(
@@ -211,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
                     blurRadius: 20,
-                    offset: Offset(0, 10),
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
@@ -222,9 +260,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     : CustomPaint(
                         painter: HeatmapPainter(
                           data: _cachedData!,
-                          isDarkMode: context.theme.brightness == Brightness.dark,
-                          verticalPosition: AppPreferences.getVerticalPosition(),
-                          horizontalPosition: AppPreferences.getHorizontalPosition(),
+                          isDarkMode:
+                              context.theme.brightness == Brightness.dark,
+                          verticalPosition:
+                              AppPreferences.getVerticalPosition(),
+                          horizontalPosition:
+                              AppPreferences.getHorizontalPosition(),
                           scale: AppPreferences.getScale(),
                           opacity: AppPreferences.getOpacity(),
                           customQuote: AppPreferences.getCustomQuote(),
@@ -251,8 +292,8 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (_isRefreshing) ...[
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
             Text(
               'Syncing...',
               style: TextStyle(
@@ -266,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
               size: 48,
               color: context.colorScheme.onBackground.withOpacity(0.3),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'Tap refresh to sync',
               style: TextStyle(
@@ -284,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final lastUpdate = AppPreferences.getLastUpdate();
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(AppTheme.spacing16),
+      padding: const EdgeInsets.all(AppTheme.spacing16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -297,25 +338,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.calendar_month_outlined,
                     value: '${_cachedData!.totalContributions}',
                     label: 'This Month',
-                    color: Color(0xFF39D353),
+                    color: const Color(0xFF39D353),
                   ),
                 ),
-                SizedBox(width: AppTheme.spacing12),
+                const SizedBox(width: AppTheme.spacing12),
                 Expanded(
                   child: _buildQuickStatCard(
                     icon: Icons.local_fire_department_outlined,
                     value: '${_cachedData!.currentStreak}d',
                     label: 'Streak',
-                    color: Color(0xFFFF9500),
+                    color: const Color(0xFFFF9500),
                   ),
                 ),
-                SizedBox(width: AppTheme.spacing12),
+                const SizedBox(width: AppTheme.spacing12),
                 Expanded(
                   child: _buildQuickStatCard(
                     icon: Icons.commit_outlined,
                     value: '${_cachedData!.todayCommits}',
                     label: 'Today',
-                    color: Color(0xFF58A6FF),
+                    color: const Color(0xFF58A6FF),
                   ),
                 ),
               ],
@@ -323,12 +364,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
 
           if (lastUpdate != null) ...[
-            SizedBox(height: AppTheme.spacing16),
+            const SizedBox(height: AppTheme.spacing16),
 
-            // Last Update & Auto-update status
+            // ✅ FIXED: Last Update & Auto-update status (corrected text)
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(AppTheme.spacing12),
+              padding: const EdgeInsets.all(AppTheme.spacing12),
               decoration: BoxDecoration(
                 color: Colors.green.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
@@ -336,10 +377,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.autorenew, color: Colors.green, size: 16),
-                  SizedBox(width: AppTheme.spacing8),
+                  const Icon(Icons.autorenew, color: Colors.green, size: 16),
+                  const SizedBox(width: AppTheme.spacing8),
                   Text(
-                    'Auto-updates every 4 hours',
+                    'Auto-updates daily', // ✅ FIXED: Changed from "every 4 hours"
                     style: context.textTheme.bodySmall?.copyWith(
                       color: Colors.green,
                       fontWeight: FontWeight.w500,
@@ -361,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
   }) {
     return Container(
-      padding: EdgeInsets.all(AppTheme.spacing12),
+      padding: const EdgeInsets.all(AppTheme.spacing12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
@@ -369,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           Icon(icon, color: color, size: 24),
-          SizedBox(height: AppTheme.spacing4),
+          const SizedBox(height: AppTheme.spacing4),
           Text(
             value,
             style: context.textTheme.titleLarge?.copyWith(

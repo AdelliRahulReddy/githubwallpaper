@@ -21,9 +21,16 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   void _loadData() {
-    setState(() {
-      _cachedData = AppPreferences.getCachedData();
-    });
+    try {
+      setState(() {
+        _cachedData = AppPreferences.getCachedData();
+      });
+    } catch (e) {
+      debugPrint('StatsScreen: Error loading data: $e');
+      setState(() {
+        _cachedData = null;
+      });
+    }
   }
 
   @override
@@ -46,7 +53,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: AppTheme.spacing4),
+                    const SizedBox(height: AppTheme.spacing4),
                     Text(
                       '${AppDateUtils.getCurrentMonthName()} ${DateTime.now().year}',
                       style: context.textTheme.bodyMedium?.copyWith(
@@ -61,7 +68,7 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
 
             // Content
-            if (_cachedData != null)
+            if (_cachedData != null && _cachedData!.days.isNotEmpty)
               SliverPadding(
                 padding: context.screenPadding,
                 sliver: SliverList(
@@ -89,7 +96,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     // Best Day Card
                     _buildBestDayCard(),
 
-                    SizedBox(height: AppTheme.spacing24),
+                    const SizedBox(height: AppTheme.spacing24),
                   ]),
                 ),
               )
@@ -106,12 +113,12 @@ class _StatsScreenState extends State<StatsScreen> {
                           0.3,
                         ),
                       ),
-                      SizedBox(height: AppTheme.spacing16),
+                      const SizedBox(height: AppTheme.spacing16),
                       Text(
                         'No data available',
                         style: context.textTheme.titleMedium,
                       ),
-                      SizedBox(height: AppTheme.spacing8),
+                      const SizedBox(height: AppTheme.spacing8),
                       Text(
                         'Sync your GitHub data first',
                         style: context.textTheme.bodySmall,
@@ -139,14 +146,14 @@ class _StatsScreenState extends State<StatsScreen> {
               icon: Icons.commit_outlined,
               value: '${_cachedData!.totalContributions}',
               label: 'Total Contributions',
-              color: Color(0xFF26A641),
+              color: const Color(0xFF26A641),
               width: cardWidth,
             ),
             _buildStatCard(
               icon: Icons.local_fire_department_outlined,
               value: '${_cachedData!.currentStreak}',
               label: 'Current Streak',
-              color: Color(0xFFFF9500),
+              color: const Color(0xFFFF9500),
               width: cardWidth,
               suffix: ' days',
             ),
@@ -154,7 +161,7 @@ class _StatsScreenState extends State<StatsScreen> {
               icon: Icons.trending_up_outlined,
               value: '${_cachedData!.longestStreak}',
               label: 'Longest Streak',
-              color: Color(0xFFA371F7),
+              color: const Color(0xFFA371F7),
               width: cardWidth,
               suffix: ' days',
             ),
@@ -162,7 +169,7 @@ class _StatsScreenState extends State<StatsScreen> {
               icon: Icons.calendar_today_outlined,
               value: '${_cachedData!.todayCommits}',
               label: 'Today',
-              color: Color(0xFF58A6FF),
+              color: const Color(0xFF58A6FF),
               width: cardWidth,
             ),
           ],
@@ -181,7 +188,7 @@ class _StatsScreenState extends State<StatsScreen> {
   }) {
     return Container(
       width: width,
-      padding: EdgeInsets.all(AppTheme.spacing16),
+      padding: const EdgeInsets.all(AppTheme.spacing16),
       decoration: BoxDecoration(
         color: context.surfaceColor,
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
@@ -193,7 +200,7 @@ class _StatsScreenState extends State<StatsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.all(AppTheme.spacing10),
+            padding: const EdgeInsets.all(AppTheme.spacing10),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
@@ -201,7 +208,7 @@ class _StatsScreenState extends State<StatsScreen> {
             child: Icon(icon, color: color, size: 24),
           ),
 
-          SizedBox(height: AppTheme.spacing16),
+          const SizedBox(height: AppTheme.spacing16),
 
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -215,7 +222,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
               if (suffix.isNotEmpty)
                 Padding(
-                  padding: EdgeInsets.only(
+                  padding: const EdgeInsets.only(
                     left: AppTheme.spacing4,
                     bottom: AppTheme.spacing4,
                   ),
@@ -229,7 +236,7 @@ class _StatsScreenState extends State<StatsScreen> {
             ],
           ),
 
-          SizedBox(height: AppTheme.spacing4),
+          const SizedBox(height: AppTheme.spacing4),
 
           Text(
             label,
@@ -246,13 +253,19 @@ class _StatsScreenState extends State<StatsScreen> {
     final monthName = AppDateUtils.getCurrentMonthName();
     final daysInMonth = AppDateUtils.getDaysInCurrentMonth();
     final currentDay = AppDateUtils.getCurrentDayOfMonth();
-    final progress = currentDay / daysInMonth;
-    final averageDaily = _cachedData!.totalContributions / currentDay;
-    final projectedTotal = (averageDaily * daysInMonth).round();
+
+    // ✅ FIXED: Guard against division by zero
+    final progress = currentDay > 0 ? currentDay / daysInMonth : 0.0;
+    final averageDaily = currentDay > 0
+        ? _cachedData!.totalContributions / currentDay
+        : 0.0;
+    final projectedTotal = currentDay > 0
+        ? (averageDaily * daysInMonth).round()
+        : 0;
 
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(AppTheme.spacing20),
+        padding: const EdgeInsets.all(AppTheme.spacing20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -268,7 +281,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: AppTheme.spacing4),
+                    const SizedBox(height: AppTheme.spacing4),
                     Text(
                       'Day $currentDay of $daysInMonth',
                       style: context.textTheme.bodyMedium?.copyWith(
@@ -280,7 +293,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ],
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: AppTheme.spacing12,
                     vertical: AppTheme.spacing8,
                   ),
@@ -299,7 +312,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ],
             ),
 
-            SizedBox(height: AppTheme.spacing20),
+            const SizedBox(height: AppTheme.spacing20),
 
             // Progress Bar
             ClipRRect(
@@ -314,7 +327,7 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ),
 
-            SizedBox(height: AppTheme.spacing20),
+            const SizedBox(height: AppTheme.spacing20),
 
             // Metrics Row
             Row(
@@ -323,7 +336,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   child: _buildMetricItem(
                     label: 'Average/Day',
                     value: averageDaily.toStringAsFixed(1),
-                    color: Color(0xFF58A6FF),
+                    color: const Color(0xFF58A6FF),
                   ),
                 ),
                 Container(
@@ -335,7 +348,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   child: _buildMetricItem(
                     label: 'Projected Total',
                     value: '$projectedTotal',
-                    color: Color(0xFF26A641),
+                    color: const Color(0xFF26A641),
                   ),
                 ),
               ],
@@ -360,7 +373,7 @@ class _StatsScreenState extends State<StatsScreen> {
             color: color,
           ),
         ),
-        SizedBox(height: AppTheme.spacing4),
+        const SizedBox(height: AppTheme.spacing4),
         Text(
           label,
           style: context.textTheme.bodySmall,
@@ -375,13 +388,17 @@ class _StatsScreenState extends State<StatsScreen> {
         .where((count) => count > 0)
         .length;
     final inactiveDays = AppDateUtils.getCurrentDayOfMonth() - activeDays;
-    final maxDaily = _cachedData!.dailyContributions.values.reduce(
-      (max, count) => count > max ? count : max,
-    );
+
+    // ✅ FIXED: Safe reduce with fallback
+    final maxDaily = _cachedData!.dailyContributions.values.isNotEmpty
+        ? _cachedData!.dailyContributions.values.reduce(
+            (max, count) => count > max ? count : max,
+          )
+        : 0;
 
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(AppTheme.spacing20),
+        padding: const EdgeInsets.all(AppTheme.spacing20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -392,31 +409,31 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ),
 
-            SizedBox(height: AppTheme.spacing20),
+            const SizedBox(height: AppTheme.spacing20),
 
             _buildBreakdownRow(
               icon: Icons.check_circle_outline,
               label: 'Active Days',
               value: '$activeDays',
-              color: Color(0xFF26A641),
+              color: const Color(0xFF26A641),
             ),
 
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
 
             _buildBreakdownRow(
               icon: Icons.cancel_outlined,
               label: 'Inactive Days',
               value: '$inactiveDays',
-              color: Color(0xFF8B949E),
+              color: const Color(0xFF8B949E),
             ),
 
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
 
             _buildBreakdownRow(
               icon: Icons.stars_outlined,
               label: 'Max in a Day',
               value: '$maxDaily',
-              color: Color(0xFFA371F7),
+              color: const Color(0xFFA371F7),
             ),
           ],
         ),
@@ -433,7 +450,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(AppTheme.spacing8),
+          padding: const EdgeInsets.all(AppTheme.spacing8),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
@@ -441,7 +458,7 @@ class _StatsScreenState extends State<StatsScreen> {
           child: Icon(icon, color: color, size: 20),
         ),
 
-        SizedBox(width: AppTheme.spacing12),
+        const SizedBox(width: AppTheme.spacing12),
 
         Expanded(child: Text(label, style: context.textTheme.bodyLarge)),
 
@@ -471,7 +488,7 @@ class _StatsScreenState extends State<StatsScreen> {
 
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(AppTheme.spacing20),
+        padding: const EdgeInsets.all(AppTheme.spacing20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -482,19 +499,19 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ),
 
-            SizedBox(height: AppTheme.spacing20),
+            const SizedBox(height: AppTheme.spacing20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: weekDays.map((day) {
                 final count = day['count'] as int;
-                final height = (maxCount > 0 ? (count / maxCount) * 100 : 10.0).toDouble();
+                final height = (maxCount > 0 ? (count / maxCount) * 100 : 10.0);
                 final isToday = (day['date'] as DateTime).day == today.day;
 
                 return Expanded(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: AppTheme.spacing4,
                     ),
                     child: Column(
@@ -504,27 +521,27 @@ class _StatsScreenState extends State<StatsScreen> {
                           style: context.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: count > 0
-                                ? Color(0xFF26A641)
+                                ? const Color(0xFF26A641)
                                 : context.colorScheme.onBackground.withOpacity(
                                     0.4,
                                   ),
                           ),
                         ),
-                        SizedBox(height: AppTheme.spacing8),
+                        const SizedBox(height: AppTheme.spacing8),
                         Container(
                           height: height.clamp(10.0, 100.0),
                           decoration: BoxDecoration(
                             color: count > 0
-                                ? Color(0xFF26A641)
+                                ? const Color(0xFF26A641)
                                 : context.colorScheme.onBackground.withOpacity(
                                     0.1,
                                   ),
-                            borderRadius: BorderRadius.vertical(
+                            borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(AppTheme.spacing4),
                             ),
                           ),
                         ),
-                        SizedBox(height: AppTheme.spacing8),
+                        const SizedBox(height: AppTheme.spacing8),
                         Text(
                           (day['day'] as String).substring(0, 1),
                           style: context.textTheme.labelSmall?.copyWith(
@@ -552,6 +569,12 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Widget _buildBestDayCard() {
     final entries = _cachedData!.dailyContributions.entries.toList();
+
+    // ✅ FIXED: Check if entries is empty before accessing
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     entries.sort((a, b) => b.value.compareTo(a.value));
     final bestDay = entries.first;
     final date = DateTime(
@@ -563,12 +586,12 @@ class _StatsScreenState extends State<StatsScreen> {
 
     return Card(
       child: Container(
-        padding: EdgeInsets.all(AppTheme.spacing20),
+        padding: const EdgeInsets.all(AppTheme.spacing20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFFFFD700).withOpacity(0.1),
-              Color(0xFFFF9500).withOpacity(0.05),
+              const Color(0xFFFFD700).withOpacity(0.1),
+              const Color(0xFFFF9500).withOpacity(0.05),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -578,19 +601,19 @@ class _StatsScreenState extends State<StatsScreen> {
         child: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(AppTheme.spacing16),
+              padding: const EdgeInsets.all(AppTheme.spacing16),
               decoration: BoxDecoration(
-                color: Color(0xFFFFD700).withOpacity(0.2),
+                color: const Color(0xFFFFD700).withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.emoji_events,
                 color: Color(0xFFFFD700),
                 size: 32,
               ),
             ),
 
-            SizedBox(width: AppTheme.spacing16),
+            const SizedBox(width: AppTheme.spacing16),
 
             Expanded(
               child: Column(
@@ -602,7 +625,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       color: context.colorScheme.onBackground.withOpacity(0.6),
                     ),
                   ),
-                  SizedBox(height: AppTheme.spacing4),
+                  const SizedBox(height: AppTheme.spacing4),
                   Text(
                     '$dayName, ${AppDateUtils.getCurrentMonthName()} ${bestDay.key}',
                     style: context.textTheme.titleMedium?.copyWith(
@@ -617,7 +640,7 @@ class _StatsScreenState extends State<StatsScreen> {
               '${bestDay.value}',
               style: context.textTheme.displaySmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFFFD700),
+                color: const Color(0xFFFFD700),
               ),
             ),
           ],

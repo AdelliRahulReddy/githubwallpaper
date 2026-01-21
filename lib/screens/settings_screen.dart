@@ -15,7 +15,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoUpdateEnabled = true;
-  int _updateIntervalHours = 4;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -23,15 +23,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadSettings();
   }
 
-  void _loadSettings() {
-    // Load persisted settings
-    _autoUpdateEnabled = AppPreferences.prefs.getBool('auto_update_enabled') ?? true;
-    _updateIntervalHours = AppPreferences.prefs.getInt('update_interval_hours') ?? 4;
+  Future<void> _loadSettings() async {
+    try {
+      // ✅ FIXED: Use async prefs properly
+      final prefs = await AppPreferences.prefs;
+      setState(() {
+        _autoUpdateEnabled = prefs.getBool('auto_update_enabled') ?? true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('SettingsScreen: Error loading settings: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _saveSettings() async {
-    await AppPreferences.prefs.setBool('auto_update_enabled', _autoUpdateEnabled);
-    await AppPreferences.prefs.setInt('update_interval_hours', _updateIntervalHours);
+    try {
+      final prefs = await AppPreferences.prefs;
+      await prefs.setBool('auto_update_enabled', _autoUpdateEnabled);
+    } catch (e) {
+      debugPrint('SettingsScreen: Error saving settings: $e');
+    }
   }
 
   Future<void> _toggleAutoUpdate(bool value) async {
@@ -39,61 +53,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _saveSettings();
 
     if (value) {
+      // ✅ FIXED: Register with proper constraints and 24-hour interval
       await Workmanager().registerPeriodicTask(
         AppConstants.wallpaperTaskName,
         AppConstants.wallpaperTaskTag,
-        frequency: Duration(hours: _updateIntervalHours),
+        frequency:
+            AppConstants.updateInterval, // ✅ Uses 24 hours from constants
         existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
         constraints: Constraints(
           networkType: NetworkType.connected,
+          requiresBatteryNotLow: true, // ✅ Battery safe
+          requiresStorageNotLow: true, // ✅ Storage safe
         ),
+        backoffPolicy: BackoffPolicy.exponential,
+        backoffPolicyDelay: const Duration(minutes: 15),
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Auto-update enabled (every $_updateIntervalHours hours)'),
+          const SnackBar(
+            content: Text('✅ Daily auto-update enabled'),
+            backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
           ),
         );
       }
+
+      debugPrint('SettingsScreen: Auto-update enabled (24h interval)');
     } else {
       await Workmanager().cancelByUniqueName(AppConstants.wallpaperTaskName);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('🛑 Auto-update disabled'),
+            backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
           ),
         );
       }
-    }
-  }
 
-  Future<void> _changeUpdateInterval(int hours) async {
-    setState(() => _updateIntervalHours = hours);
-    await _saveSettings();
-
-    if (_autoUpdateEnabled) {
-      await Workmanager().registerPeriodicTask(
-        AppConstants.wallpaperTaskName,
-        AppConstants.wallpaperTaskTag,
-        frequency: Duration(hours: hours),
-        existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
-        constraints: Constraints(
-          networkType: NetworkType.connected,
-        ),
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⏰ Update interval changed to $hours hours'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      debugPrint('SettingsScreen: Auto-update disabled');
     }
   }
 
@@ -101,35 +103,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Clear All Data?'),
-        content: Text(
+        title: const Text('Clear All Data?'),
+        content: const Text(
           'This will log you out and remove all settings. You\'ll need to set up the app again.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(
-              foregroundColor: context.colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: Text('Clear & Logout'),
+            child: const Text('Clear & Logout'),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      await AppPreferences.clearAll();
+      try {
+        // Cancel WorkManager tasks
+        await Workmanager().cancelAll();
 
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => SetupScreen()),
-          (route) => false,
-        );
+        // Clear all preferences
+        await AppPreferences.clearAll();
+
+        debugPrint('SettingsScreen: All data cleared, returning to setup');
+
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const SetupScreen()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        debugPrint('SettingsScreen: Error clearing data: $e');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -139,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SetupScreen(canGoBack: true),
+        builder: (context) => const SetupScreen(canGoBack: true),
       ),
     );
 
@@ -153,21 +174,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = context.theme.brightness == Brightness.dark;
 
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: context.backgroundColor,
+        appBar: AppBar(title: const Text('Settings')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: context.backgroundColor,
-      appBar: AppBar(title: Text('Settings')),
+      appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: ListView(
           padding: context.screenPadding,
           children: [
             // Auto-Update Section
             _buildSectionHeader('Wallpaper Updates'),
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.autorenew_outlined,
               title: 'Auto-Update Wallpaper',
               subtitle: _autoUpdateEnabled
-                  ? 'Active - every $_updateIntervalHours hours'
+                  ? 'Active - updates daily' // ✅ FIXED: Changed from "every X hours"
                   : 'Disabled',
               trailing: Switch(
                 value: _autoUpdateEnabled,
@@ -176,24 +205,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            if (_autoUpdateEnabled) ...[
-              SizedBox(height: AppTheme.spacing12),
-              _buildIntervalSelector(),
-            ],
-
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
             _buildInfoCard(
               icon: Icons.info_outline,
               title: 'How it works',
               subtitle:
-                  'Your wallpaper automatically updates with the latest GitHub contributions every ${_updateIntervalHours} hours, even when the app is closed.',
+                  'Your wallpaper automatically updates with the latest GitHub contributions once per day, even when the app is closed.', // ✅ FIXED
             ),
 
-            SizedBox(height: AppTheme.spacing24),
+            const SizedBox(height: AppTheme.spacing24),
 
             // Appearance Section
             _buildSectionHeader('Appearance'),
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.dark_mode_outlined,
               title: 'Dark Mode',
@@ -203,17 +227,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) async {
                   await AppPreferences.setDarkMode(value);
                   // Restart entire app to apply theme everywhere
-                  MyApp.restartApp(context);
+                  if (mounted) {
+                    MyApp.restartApp(context);
+                  }
                 },
                 activeColor: context.primaryColor,
               ),
             ),
 
-            SizedBox(height: AppTheme.spacing24),
+            const SizedBox(height: AppTheme.spacing24),
 
             // Account Section
             _buildSectionHeader('Account'),
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.person_outline,
               title: 'GitHub Account',
@@ -223,14 +249,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 size: 20,
                 color: context.primaryColor,
               ),
-              onTap: _editAccount,  // Now navigates properly with back support!
+              onTap: _editAccount,
             ),
 
-            SizedBox(height: AppTheme.spacing24),
+            const SizedBox(height: AppTheme.spacing24),
 
             // Data Section
             _buildSectionHeader('Data'),
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.delete_outline,
               title: 'Clear All Data & Logout',
@@ -244,18 +270,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDestructive: true,
             ),
 
-            SizedBox(height: AppTheme.spacing24),
+            const SizedBox(height: AppTheme.spacing24),
 
             // About Section
             _buildSectionHeader('About'),
-            SizedBox(height: AppTheme.spacing12),
+            const SizedBox(height: AppTheme.spacing12),
             _buildSettingTile(
               icon: Icons.info_outline,
               title: 'Version',
               subtitle: '1.0.0',
             ),
 
-            SizedBox(height: AppTheme.spacing40),
+            const SizedBox(height: AppTheme.spacing40),
           ],
         ),
       ),
@@ -264,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: EdgeInsets.only(left: AppTheme.spacing4),
+      padding: const EdgeInsets.only(left: AppTheme.spacing4),
       child: Text(
         title.toUpperCase(),
         style: context.textTheme.labelLarge?.copyWith(
@@ -288,11 +314,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
         child: Padding(
-          padding: EdgeInsets.all(AppTheme.spacing12),
+          padding: const EdgeInsets.all(AppTheme.spacing12),
           child: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(AppTheme.spacing8),
+                padding: const EdgeInsets.all(AppTheme.spacing8),
                 decoration: BoxDecoration(
                   color: isDestructive
                       ? context.colorScheme.error.withOpacity(0.1)
@@ -307,7 +333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   size: 20,
                 ),
               ),
-              SizedBox(width: AppTheme.spacing12),
+              const SizedBox(width: AppTheme.spacing12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,57 +345,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    SizedBox(height: AppTheme.spacing4),
+                    const SizedBox(height: AppTheme.spacing4),
                     Text(subtitle, style: context.textTheme.bodySmall),
                   ],
                 ),
               ),
               if (trailing != null) ...[
-                SizedBox(width: AppTheme.spacing12),
+                const SizedBox(width: AppTheme.spacing12),
                 trailing,
               ],
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIntervalSelector() {
-    final intervals = [2, 4, 6, 12];
-
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(AppTheme.spacing16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Update Interval', style: context.textTheme.titleMedium),
-            SizedBox(height: AppTheme.spacing12),
-            Wrap(
-              spacing: AppTheme.spacing8,
-              runSpacing: AppTheme.spacing8,
-              children: intervals.map((hours) {
-                final isSelected = _updateIntervalHours == hours;
-                return ChoiceChip(
-                  label: Text('$hours hrs'),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) _changeUpdateInterval(hours);
-                  },
-                  selectedColor: context.primaryColor,
-                  backgroundColor: context.surfaceColor,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : context.textColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  side: BorderSide(
-                    color: context.colorScheme.onBackground.withOpacity(0.1),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
         ),
       ),
     );
@@ -381,7 +367,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String subtitle,
   }) {
     return Container(
-      padding: EdgeInsets.all(AppTheme.spacing16),
+      padding: const EdgeInsets.all(AppTheme.spacing16),
       decoration: BoxDecoration(
         color: context.primaryColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
@@ -391,7 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: context.primaryColor, size: 20),
-          SizedBox(width: AppTheme.spacing12),
+          const SizedBox(width: AppTheme.spacing12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,7 +388,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: AppTheme.spacing4),
+                const SizedBox(height: AppTheme.spacing4),
                 Text(
                   subtitle,
                   style: context.textTheme.bodySmall?.copyWith(height: 1.5),

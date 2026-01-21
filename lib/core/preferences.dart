@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import '../models/contribution_data.dart';
 import 'constants.dart';
@@ -25,188 +26,438 @@ class AppPreferences {
 
   static SharedPreferences? _prefs;
 
+  /// ✅ Initialize SharedPreferences - MUST be called in main()
   static Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      debugPrint('AppPreferences: Initialized successfully');
+    } catch (e) {
+      debugPrint('AppPreferences: Initialization failed: $e');
+      rethrow;
+    }
   }
 
-  static SharedPreferences get prefs {
+  /// ✅ Safe getter with automatic initialization fallback
+  static Future<SharedPreferences> get prefs async {
     if (_prefs == null) {
-      throw Exception('AppPreferences not initialized. Call init() first.');
+      debugPrint('AppPreferences: Not initialized, initializing now...');
+      await init();
     }
     return _prefs!;
   }
 
-  // Username
+  /// ✅ Synchronous getter (throws if not initialized)
+  static SharedPreferences get prefsSync {
+    if (_prefs == null) {
+      throw Exception(
+        'AppPreferences not initialized. Call init() first in main().',
+      );
+    }
+    return _prefs!;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // USERNAME
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setUsername(String username) async {
-    await prefs.setString(_keyUsername, username);
+    final trimmed = username.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Username cannot be empty');
+    }
+    await (await prefs).setString(_keyUsername, trimmed);
+    debugPrint('AppPreferences: Username saved');
   }
 
   static String? getUsername() {
-    return prefs.getString(_keyUsername);
+    try {
+      return prefsSync.getString(_keyUsername);
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading username: $e');
+      return null;
+    }
   }
 
-  // Token
+  // ══════════════════════════════════════════════════════════════════════════
+  // TOKEN (⚠️ SECURITY WARNING: Stored in plain text)
+  // ══════════════════════════════════════════════════════════════════════════
+  // TODO: For production, migrate to flutter_secure_storage
+  // SharedPreferences stores data in plain text XML files that can be accessed
+  // by rooted devices, backup tools, or malware. Consider using:
+  // https://pub.dev/packages/flutter_secure_storage
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setToken(String token) async {
-    await prefs.setString(_keyToken, token);
+    final trimmed = token.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Token cannot be empty');
+    }
+    if (!trimmed.startsWith('ghp_') && !trimmed.startsWith('github_pat_')) {
+      debugPrint(
+        'AppPreferences: Warning - Token does not match GitHub format',
+      );
+    }
+    await (await prefs).setString(_keyToken, trimmed);
+    debugPrint('AppPreferences: Token saved (length: ${trimmed.length})');
   }
 
   static String? getToken() {
-    return prefs.getString(_keyToken);
+    try {
+      return prefsSync.getString(_keyToken);
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading token: $e');
+      return null;
+    }
   }
 
-  // Cached Data
+  // ══════════════════════════════════════════════════════════════════════════
+  // CACHED DATA (with error recovery)
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setCachedData(CachedContributionData data) async {
-    final json = jsonEncode(data.toJson());
-    await prefs.setString(_keyCachedData, json);
+    try {
+      final json = jsonEncode(data.toJson());
+      await (await prefs).setString(_keyCachedData, json);
+      debugPrint('AppPreferences: Cached data saved (${json.length} bytes)');
+    } catch (e) {
+      debugPrint('AppPreferences: Error saving cached data: $e');
+      rethrow;
+    }
   }
 
   static CachedContributionData? getCachedData() {
-    final json = prefs.getString(_keyCachedData);
-    if (json == null) return null;
-    return CachedContributionData.fromJson(jsonDecode(json));
+    try {
+      final json = prefsSync.getString(_keyCachedData);
+      if (json == null || json.isEmpty) return null;
+
+      final decoded = jsonDecode(json);
+      return CachedContributionData.fromJson(decoded);
+    } on FormatException catch (e) {
+      debugPrint(
+        'AppPreferences: Corrupted cached data (JSON parse error): $e',
+      );
+      // Clear corrupted data to prevent repeated errors
+      prefsSync.remove(_keyCachedData);
+      return null;
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading cached data: $e');
+      return null;
+    }
   }
 
-  // Last Update
+  // ══════════════════════════════════════════════════════════════════════════
+  // LAST UPDATE (with error recovery)
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setLastUpdate(DateTime dateTime) async {
-    await prefs.setString(_keyLastUpdate, dateTime.toIso8601String());
+    await (await prefs).setString(_keyLastUpdate, dateTime.toIso8601String());
+    debugPrint('AppPreferences: Last update time saved: $dateTime');
   }
 
   static DateTime? getLastUpdate() {
-    final str = prefs.getString(_keyLastUpdate);
-    if (str == null) return null;
-    return DateTime.parse(str);
+    try {
+      final str = prefsSync.getString(_keyLastUpdate);
+      if (str == null || str.isEmpty) return null;
+
+      return DateTime.parse(str);
+    } on FormatException catch (e) {
+      debugPrint('AppPreferences: Corrupted last update date: $e');
+      // Clear corrupted data
+      prefsSync.remove(_keyLastUpdate);
+      return null;
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading last update: $e');
+      return null;
+    }
   }
 
-  // Dark Mode
+  // ══════════════════════════════════════════════════════════════════════════
+  // DARK MODE
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setDarkMode(bool enabled) async {
-    await prefs.setBool(_keyDarkMode, enabled);
+    await (await prefs).setBool(_keyDarkMode, enabled);
   }
 
   static bool getDarkMode() {
-    return prefs.getBool(_keyDarkMode) ?? false;
+    try {
+      return prefsSync.getBool(_keyDarkMode) ?? false;
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading dark mode: $e');
+      return false;
+    }
   }
 
-  // Vertical Position
+  // ══════════════════════════════════════════════════════════════════════════
+  // POSITION & SCALE (with validation)
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setVerticalPosition(double value) async {
-    await prefs.setDouble(_keyVerticalPosition, value);
+    final clamped = value.clamp(
+      AppConstants.minVerticalPos,
+      AppConstants.maxVerticalPos,
+    );
+    if (clamped != value) {
+      debugPrint(
+        'AppPreferences: Vertical position clamped from $value to $clamped',
+      );
+    }
+    await (await prefs).setDouble(_keyVerticalPosition, clamped);
   }
 
   static double getVerticalPosition() {
-    return prefs.getDouble(_keyVerticalPosition) ??
-        AppConstants.defaultVerticalPosition;
+    try {
+      final value = prefsSync.getDouble(_keyVerticalPosition);
+      if (value == null) return AppConstants.defaultVerticalPosition;
+
+      // Validate stored value
+      return value.clamp(
+        AppConstants.minVerticalPos,
+        AppConstants.maxVerticalPos,
+      );
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading vertical position: $e');
+      return AppConstants.defaultVerticalPosition;
+    }
   }
 
-  // Horizontal Position
   static Future<void> setHorizontalPosition(double value) async {
-    await prefs.setDouble(_keyHorizontalPosition, value);
+    final clamped = value.clamp(0.0, 1.0);
+    if (clamped != value) {
+      debugPrint(
+        'AppPreferences: Horizontal position clamped from $value to $clamped',
+      );
+    }
+    await (await prefs).setDouble(_keyHorizontalPosition, clamped);
   }
 
   static double getHorizontalPosition() {
-    return prefs.getDouble(_keyHorizontalPosition) ??
-        AppConstants.defaultHorizontalPosition;
+    try {
+      final value = prefsSync.getDouble(_keyHorizontalPosition);
+      if (value == null) return AppConstants.defaultHorizontalPosition;
+
+      return value.clamp(0.0, 1.0);
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading horizontal position: $e');
+      return AppConstants.defaultHorizontalPosition;
+    }
   }
 
-  // Scale
   static Future<void> setScale(double value) async {
-    await prefs.setDouble(_keyScale, value);
+    final clamped = value.clamp(AppConstants.minScale, AppConstants.maxScale);
+    if (clamped != value) {
+      debugPrint('AppPreferences: Scale clamped from $value to $clamped');
+    }
+    await (await prefs).setDouble(_keyScale, clamped);
   }
 
   static double getScale() {
-    return prefs.getDouble(_keyScale) ?? AppConstants.defaultScale;
+    try {
+      final value = prefsSync.getDouble(_keyScale);
+      if (value == null) return AppConstants.defaultScale;
+
+      return value.clamp(AppConstants.minScale, AppConstants.maxScale);
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading scale: $e');
+      return AppConstants.defaultScale;
+    }
   }
 
-  // Opacity
   static Future<void> setOpacity(double value) async {
-    await prefs.setDouble(_keyOpacity, value);
+    final clamped = value.clamp(0.0, 1.0);
+    if (clamped != value) {
+      debugPrint('AppPreferences: Opacity clamped from $value to $clamped');
+    }
+    await (await prefs).setDouble(_keyOpacity, clamped);
   }
 
   static double getOpacity() {
-    return prefs.getDouble(_keyOpacity) ?? 1.0;
+    try {
+      final value = prefsSync.getDouble(_keyOpacity);
+      if (value == null) return 1.0;
+
+      return value.clamp(0.0, 1.0);
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading opacity: $e');
+      return 1.0;
+    }
   }
 
-  // Custom Quote
+  // ══════════════════════════════════════════════════════════════════════════
+  // CUSTOM QUOTE
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setCustomQuote(String quote) async {
-    await prefs.setString(_keyCustomQuote, quote);
+    final trimmed = quote.trim();
+    // Limit quote length to prevent wallpaper overflow
+    final limited = trimmed.length > 100 ? trimmed.substring(0, 100) : trimmed;
+    if (limited != trimmed) {
+      debugPrint('AppPreferences: Quote truncated to 100 characters');
+    }
+    await (await prefs).setString(_keyCustomQuote, limited);
   }
 
   static String getCustomQuote() {
-    return prefs.getString(_keyCustomQuote) ?? '';
+    try {
+      return prefsSync.getString(_keyCustomQuote) ?? '';
+    } catch (e) {
+      debugPrint('AppPreferences: Error reading custom quote: $e');
+      return '';
+    }
   }
 
-  // Padding Top
+  // ══════════════════════════════════════════════════════════════════════════
+  // PADDING (with validation)
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setPaddingTop(double value) async {
-    await prefs.setDouble(_keyPaddingTop, value);
+    final clamped = value.clamp(0.0, 200.0);
+    await (await prefs).setDouble(_keyPaddingTop, clamped);
   }
 
   static double getPaddingTop() {
-    return prefs.getDouble(_keyPaddingTop) ?? 0.0;
+    try {
+      return prefsSync.getDouble(_keyPaddingTop)?.clamp(0.0, 200.0) ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
   }
 
-  // Padding Bottom
   static Future<void> setPaddingBottom(double value) async {
-    await prefs.setDouble(_keyPaddingBottom, value);
+    final clamped = value.clamp(0.0, 200.0);
+    await (await prefs).setDouble(_keyPaddingBottom, clamped);
   }
 
   static double getPaddingBottom() {
-    return prefs.getDouble(_keyPaddingBottom) ?? 0.0;
+    try {
+      return prefsSync.getDouble(_keyPaddingBottom)?.clamp(0.0, 200.0) ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
   }
 
-  // Padding Left
   static Future<void> setPaddingLeft(double value) async {
-    await prefs.setDouble(_keyPaddingLeft, value);
+    final clamped = value.clamp(0.0, 200.0);
+    await (await prefs).setDouble(_keyPaddingLeft, clamped);
   }
 
   static double getPaddingLeft() {
-    return prefs.getDouble(_keyPaddingLeft) ?? 0.0;
+    try {
+      return prefsSync.getDouble(_keyPaddingLeft)?.clamp(0.0, 200.0) ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
   }
 
-  // Padding Right
   static Future<void> setPaddingRight(double value) async {
-    await prefs.setDouble(_keyPaddingRight, value);
+    final clamped = value.clamp(0.0, 200.0);
+    await (await prefs).setDouble(_keyPaddingRight, clamped);
   }
 
   static double getPaddingRight() {
-    return prefs.getDouble(_keyPaddingRight) ?? 0.0;
+    try {
+      return prefsSync.getDouble(_keyPaddingRight)?.clamp(0.0, 200.0) ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
   }
 
-  // Corner Radius
+  // ══════════════════════════════════════════════════════════════════════════
+  // OTHER SETTINGS
+  // ══════════════════════════════════════════════════════════════════════════
+
   static Future<void> setCornerRadius(double value) async {
-    await prefs.setDouble(_keyCornerRadius, value);
+    final clamped = value.clamp(0.0, 50.0);
+    await (await prefs).setDouble(_keyCornerRadius, clamped);
   }
 
   static double getCornerRadius() {
-    return prefs.getDouble(_keyCornerRadius) ?? 0.0;
+    try {
+      return prefsSync.getDouble(_keyCornerRadius)?.clamp(0.0, 50.0) ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
   }
 
-  // Quote Font Size
   static Future<void> setQuoteFontSize(double value) async {
-    await prefs.setDouble(_keyQuoteFontSize, value);
+    final clamped = value.clamp(8.0, 32.0);
+    await (await prefs).setDouble(_keyQuoteFontSize, clamped);
   }
 
   static double getQuoteFontSize() {
-    return prefs.getDouble(_keyQuoteFontSize) ?? 14.0;
+    try {
+      return prefsSync.getDouble(_keyQuoteFontSize)?.clamp(8.0, 32.0) ?? 14.0;
+    } catch (e) {
+      return 14.0;
+    }
   }
 
-  // Quote Opacity
   static Future<void> setQuoteOpacity(double value) async {
-    await prefs.setDouble(_keyQuoteOpacity, value);
+    final clamped = value.clamp(0.0, 1.0);
+    await (await prefs).setDouble(_keyQuoteOpacity, clamped);
   }
 
   static double getQuoteOpacity() {
-    return prefs.getDouble(_keyQuoteOpacity) ?? 1.0;
+    try {
+      return prefsSync.getDouble(_keyQuoteOpacity)?.clamp(0.0, 1.0) ?? 1.0;
+    } catch (e) {
+      return 1.0;
+    }
   }
 
-  // Wallpaper Target
   static Future<void> setWallpaperTarget(String target) async {
-    await prefs.setString(_keyWallpaperTarget, target);
+    if (!['home', 'lock', 'both'].contains(target)) {
+      throw ArgumentError('Invalid wallpaper target: $target');
+    }
+    await (await prefs).setString(_keyWallpaperTarget, target);
   }
 
   static String getWallpaperTarget() {
-    return prefs.getString(_keyWallpaperTarget) ?? 'both';
+    try {
+      final target = prefsSync.getString(_keyWallpaperTarget) ?? 'both';
+      // Validate
+      if (['home', 'lock', 'both'].contains(target)) {
+        return target;
+      }
+      return 'both';
+    } catch (e) {
+      return 'both';
+    }
   }
 
-  // Clear All
+  // ══════════════════════════════════════════════════════════════════════════
+  // CLEAR DATA (with options)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// ✅ Clear all data (use with caution)
   static Future<void> clearAll() async {
-    await prefs.clear();
+    await (await prefs).clear();
+    debugPrint('AppPreferences: All data cleared');
+  }
+
+  /// ✅ Clear data but preserve credentials (safer for logout)
+  static Future<void> clearUserData() async {
+    final p = await prefs;
+
+    // Save credentials
+    final username = p.getString(_keyUsername);
+    final token = p.getString(_keyToken);
+
+    // Clear everything
+    await p.clear();
+
+    // Restore credentials
+    if (username != null) await p.setString(_keyUsername, username);
+    if (token != null) await p.setString(_keyToken, token);
+
+    debugPrint('AppPreferences: User data cleared (credentials preserved)');
+  }
+
+  /// ✅ Clear only cached wallpaper data (safe)
+  static Future<void> clearCache() async {
+    final p = await prefs;
+    await p.remove(_keyCachedData);
+    await p.remove(_keyLastUpdate);
+    debugPrint('AppPreferences: Cache cleared');
   }
 }

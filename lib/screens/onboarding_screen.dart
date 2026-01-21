@@ -19,21 +19,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Track GitHub Activity',
       description:
           'Visualize your monthly contributions as a beautiful heatmap wallpaper',
-      color: Color(0xFF26A641),
+      color: const Color(0xFF26A641),
     ),
     OnboardingPage(
       icon: Icons.wallpaper_outlined,
       title: 'Live Wallpaper',
       description:
-          'Your GitHub graph updates automatically every 4 hours on your home screen',
-      color: Color(0xFF58A6FF),
+          'Your GitHub graph updates automatically daily on your home screen', // ✅ FIXED: Changed from "every 4 hours"
+      color: const Color(0xFF58A6FF),
     ),
     OnboardingPage(
       icon: Icons.auto_awesome_outlined,
       title: 'Stay Motivated',
       description:
           'See your coding streak daily and stay committed to your goals',
-      color: Color(0xFFFF9500),
+      color: const Color(0xFFFF9500),
     ),
   ];
 
@@ -48,7 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   top: AppTheme.spacing12,
                   right: AppTheme.spacing16,
                 ),
@@ -80,7 +80,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
             // Page indicators
             Padding(
-              padding: EdgeInsets.symmetric(vertical: AppTheme.spacing24),
+              padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing24),
               child: _buildPageIndicator(),
             ),
 
@@ -98,7 +98,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _pages[_currentPage].color,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                           vertical: AppTheme.spacing16,
                         ),
                         shape: RoundedRectangleBorder(
@@ -119,7 +119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                   ),
-                  SizedBox(height: AppTheme.spacing16),
+                  const SizedBox(height: AppTheme.spacing16),
                 ],
               ),
             ),
@@ -157,7 +157,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          SizedBox(height: AppTheme.spacing48),
+          const SizedBox(height: AppTheme.spacing48),
 
           // Title
           Text(
@@ -168,11 +168,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          SizedBox(height: AppTheme.spacing16),
+          const SizedBox(height: AppTheme.spacing16),
 
           // Description
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing16),
             child: Text(
               page.description,
               textAlign: TextAlign.center,
@@ -194,7 +194,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _pages.length,
         (index) => AnimatedContainer(
           duration: AppTheme.durationNormal,
-          margin: EdgeInsets.symmetric(horizontal: AppTheme.spacing4),
+          margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacing4),
           width: _currentPage == index ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
@@ -219,7 +219,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => SetupScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const SetupScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

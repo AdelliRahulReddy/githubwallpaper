@@ -1,13 +1,12 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.example.github_wallpaper"
-    compileSdk = flutter.compileSdkVersion
+    namespace = "com.rahulreddy.githubwallpaper"
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -15,40 +14,51 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // ✅ FIXED: Add Kotlin JVM target to match Java
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.github_wallpaper"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.rahulreddy.githubwallpaper"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
-            isShrinkResources = false
-        }
-    }
-
-    applicationVariants.all {
-        val variant = this
-        variant.outputs.all {
-            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "github-wallpaper-v${variant.versionName}.apk"
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+// Workaround: Copy APK to Flutter expected location (fixes Kotlin DSL path detection issue)
+tasks.whenTaskAdded {
+    if (name == "assembleDebug" || name == "assembleRelease") {
+        doLast {
+            val buildType = if (name.contains("Debug")) "debug" else "release"
+            val sourceDir = file("${project.layout.buildDirectory.get()}/outputs/flutter-apk")
+            val targetDir = file("${rootProject.projectDir}/../build/app/outputs/flutter-apk")
+            
+            if (sourceDir.exists()) {
+                targetDir.mkdirs()
+                sourceDir.listFiles()?.forEach { apkFile ->
+                    if (apkFile.name.endsWith(".apk")) {
+                        apkFile.copyTo(file("${targetDir}/${apkFile.name}"), overwrite = true)
+                    }
+                }
+            }
+        }
+    }
 }

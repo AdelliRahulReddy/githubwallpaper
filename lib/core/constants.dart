@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // GitHub API
-  static const String githubApiUrl = 'https://api.github.com/graphql';
-  static const Duration apiTimeout = Duration(seconds: 60);
+  // ══════════════════════════════════════════════════════════════════════════
+  // GITHUB API CONFIGURATION
+  // ══════════════════════════════════════════════════════════════════════════
 
-  // GitHub Dark Theme Colors
+  static const String githubApiUrl = 'https://api.github.com/graphql';
+  static const Duration apiTimeout = Duration(
+    seconds: 30,
+  ); // ✅ Reduced from 60s
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GITHUB DARK THEME COLORS
+  // ══════════════════════════════════════════════════════════════════════════
+
   static const Color darkBackground = Color(0xFF0D1117);
   static const Color darkSurface = Color(0xFF161B22);
   static const Color darkBorder = Color(0xFF30363D);
@@ -14,7 +22,10 @@ class AppConstants {
   static const Color darkAccent = Color(0xFF58A6FF);
   static const Color darkSuccess = Color(0xFF238636);
 
-  // GitHub Light Theme Colors
+  // ══════════════════════════════════════════════════════════════════════════
+  // GITHUB LIGHT THEME COLORS
+  // ══════════════════════════════════════════════════════════════════════════
+
   static const Color lightBackground = Color(0xFFFFFFFF);
   static const Color lightSurface = Color(0xFFF6F8FA);
   static const Color lightBorder = Color(0xFFD0D7DE);
@@ -23,45 +34,73 @@ class AppConstants {
   static const Color lightAccent = Color(0xFF0969DA);
   static const Color lightSuccess = Color(0xFF2DA44E);
 
-  // Contribution Colors (GitHub Green Scale)
-  static const Color level0 = Color(0xFF161B22); // Dark: empty
-  static const Color level1 = Color(0xFF0E4429);
-  static const Color level2 = Color(0xFF006D32);
-  static const Color level3 = Color(0xFF26A641);
-  static const Color level4 = Color(0xFF39D353);
+  // ══════════════════════════════════════════════════════════════════════════
+  // CONTRIBUTION COLORS (GitHub Green Scale)
+  // ══════════════════════════════════════════════════════════════════════════
 
-  static const Color level0Light = Color(0xFFEBEDF0); // Light: empty
-  static const Color level1Light = Color(0xFF9BE9A8);
-  static const Color level2Light = Color(0xFF40C463);
-  static const Color level3Light = Color(0xFF30A14E);
-  static const Color level4Light = Color(0xFF216E39);
+  // Dark mode contribution levels
+  static const Color level0 = Color(0xFF161B22); // Empty
+  static const Color level1 = Color(0xFF0E4429); // 1-3 contributions
+  static const Color level2 = Color(0xFF006D32); // 4-6 contributions
+  static const Color level3 = Color(0xFF26A641); // 7-9 contributions
+  static const Color level4 = Color(0xFF39D353); // 10+ contributions
 
-  // Today highlight
-  static const Color todayHighlight = Color(0xFFFF9500); // Orange glow
+  // Light mode contribution levels
+  static const Color level0Light = Color(0xFFEBEDF0); // Empty
+  static const Color level1Light = Color(0xFF9BE9A8); // 1-3 contributions
+  static const Color level2Light = Color(0xFF40C463); // 4-6 contributions
+  static const Color level3Light = Color(0xFF30A14E); // 7-9 contributions
+  static const Color level4Light = Color(0xFF216E39); // 10+ contributions
 
-  // Heatmap Settings
-  static const double boxSize = 12.0;
-  static const double boxSpacing = 3.0;
-  static const double boxRadius = 2.0;
-  static const double todayBorderWidth = 2.0;
+  // Today highlight (orange glow)
+  static const Color todayHighlight = Color(0xFFFF9500);
 
-  // Default Positions - CENTERED
-  static const double defaultVerticalPosition = 0.5;
-  static const double defaultHorizontalPosition = 0.5;
-  static const double defaultScale = 0.7;
+  // ══════════════════════════════════════════════════════════════════════════
+  // HEATMAP DISPLAY SETTINGS
+  // ══════════════════════════════════════════════════════════════════════════
 
-  // Slider Ranges - FULL CONTROL
+  static const double boxSize = 12.0; // Size of each day square
+  static const double boxSpacing = 3.0; // Gap between squares
+  static const double boxRadius = 2.0; // Corner radius of squares
+  static const double todayBorderWidth = 2.0; // Border width for today's square
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DEFAULT WALLPAPER POSITION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  static const double defaultVerticalPosition = 0.5; // Centered vertically
+  static const double defaultHorizontalPosition = 0.5; // Centered horizontally
+  static const double defaultScale = 0.7; // 70% size
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CUSTOMIZATION RANGES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Position ranges (0.0 = top/left, 1.0 = bottom/right)
   static const double minVerticalPos = 0.0;
   static const double maxVerticalPos = 1.0;
+
+  // Scale range (0.5 = 50% size, 2.0 = 200% size)
   static const double minScale = 0.5;
   static const double maxScale = 2.0;
 
-  // WorkManager
+  // ══════════════════════════════════════════════════════════════════════════
+  // WORKMANAGER CONFIGURATION (BACKGROUND TASKS)
+  // ══════════════════════════════════════════════════════════════════════════
+
   static const String wallpaperTaskName = 'github-wallpaper-update';
   static const String wallpaperTaskTag = 'updateGitHubWallpaper';
-  static const Duration updateInterval = Duration(hours: 4);
 
-  // Storage Keys
+  // ✅ TESTING: Reduced to 15 minutes for verification (Android minimum)
+  static const Duration updateInterval = Duration(minutes: 15);
+
+  // Minimum interval for WorkManager (Android requirement)
+  static const Duration minimumInterval = Duration(minutes: 15);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STORAGE KEYS (SharedPreferences)
+  // ══════════════════════════════════════════════════════════════════════════
+
   static const String keyUsername = 'github_username';
   static const String keyToken = 'github_token';
   static const String keyDarkMode = 'isDarkMode';
@@ -72,7 +111,15 @@ class AppConstants {
   static const String keyCachedData = 'cachedData';
   static const String keyLastUpdate = 'lastUpdate';
 
-  // Wallpaper Settings
-  static const int wallpaperWidth = 1080;
-  static const int wallpaperHeight = 2400;
+  // ══════════════════════════════════════════════════════════════════════════
+  // WALLPAPER DIMENSIONS (Standard FHD+ for modern phones)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  static const int wallpaperWidth = 1080; // Full HD width
+  static const int wallpaperHeight =
+      2400; // 20:9 aspect ratio (common on 2020+ phones)
+
+  // Alternative dimensions for different screen ratios
+  static const int wallpaperWidthQHD = 1440; // QHD (1440p)
+  static const int wallpaperHeightQHD = 3200; // QHD height
 }

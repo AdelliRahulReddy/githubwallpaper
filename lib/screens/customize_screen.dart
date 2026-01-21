@@ -1,8 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'dart:ui' as ui;
-import 'package:path_provider/path_provider.dart';
-import 'package:async_wallpaper/async_wallpaper.dart';
 import '../core/theme.dart';
 import '../core/constants.dart';
 import '../core/preferences.dart';
@@ -21,7 +17,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
   // Simplified settings - only essentials
   double _scale = AppConstants.defaultScale;
   String _customQuote = '';
-  
+
   bool _isSettingWallpaper = false;
   late TextEditingController _quoteController;
 
@@ -32,14 +28,25 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
   }
 
   void _loadSettings() {
-    _scale = AppPreferences.getScale();
-    _customQuote = AppPreferences.getCustomQuote();
-    _quoteController = TextEditingController(text: _customQuote);
+    try {
+      _scale = AppPreferences.getScale();
+      _customQuote = AppPreferences.getCustomQuote();
+      _quoteController = TextEditingController(text: _customQuote);
+    } catch (e) {
+      debugPrint('CustomizeScreen: Error loading settings: $e');
+      _quoteController = TextEditingController();
+    }
   }
 
   Future<void> _saveSettings() async {
-    await AppPreferences.setScale(_scale);
-    await AppPreferences.setCustomQuote(_customQuote);
+    try {
+      await AppPreferences.setScale(_scale);
+      await AppPreferences.setCustomQuote(
+        _customQuote.trim(),
+      ); // ✅ Trim whitespace
+    } catch (e) {
+      debugPrint('CustomizeScreen: Error saving settings: $e');
+    }
   }
 
   Future<void> _setWallpaper() async {
@@ -47,23 +54,26 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
     final target = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Set Wallpaper'),
+        title: const Text('Set Wallpaper'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: Icon(Icons.lock_outline, color: context.primaryColor),
-              title: Text('Lock Screen'),
+              title: const Text('Lock Screen'),
               onTap: () => Navigator.pop(context, 'lock'),
             ),
             ListTile(
               leading: Icon(Icons.home_outlined, color: context.primaryColor),
-              title: Text('Home Screen'),
+              title: const Text('Home Screen'),
               onTap: () => Navigator.pop(context, 'home'),
             ),
             ListTile(
-              leading: Icon(Icons.phone_android_outlined, color: context.primaryColor),
-              title: Text('Both Screens'),
+              leading: Icon(
+                Icons.phone_android_outlined,
+                color: context.primaryColor,
+              ),
+              title: const Text('Both Screens'),
               onTap: () => Navigator.pop(context, 'both'),
             ),
           ],
@@ -71,7 +81,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -82,72 +92,97 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
     setState(() => _isSettingWallpaper = true);
 
     try {
+      // Save settings first
       await _saveSettings();
-      
+
       // Save target preference for background updates
       await AppPreferences.setWallpaperTarget(target);
-      
+
+      // ✅ Get cached data with error handling
       final data = AppPreferences.getCachedData();
 
       if (data == null) {
         throw Exception('No data. Please sync first from Home screen.');
       }
 
-      // Use centralized wallpaper service
-      await WallpaperService.generateAndSetWallpaper(data, target: target);
+      debugPrint('CustomizeScreen: Setting wallpaper (target: $target)');
+
+      // ✅ FIXED: Use correct method name
+      final success = await WallpaperService.refreshAndSetWallpaper(
+        target: target,
+      );
+
+      if (!success) {
+        throw Exception('Wallpaper update was skipped (already updated today)');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('✅ Wallpaper set successfully!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      debugPrint('CustomizeScreen: Set wallpaper error: $e');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
     } finally {
-      setState(() => _isSettingWallpaper = false);
+      if (mounted) {
+        setState(() => _isSettingWallpaper = false);
+      }
     }
   }
 
   Future<void> _resetSettings() async {
-    setState(() {
-      _scale = AppConstants.defaultScale;
-      _customQuote = '';
-      _quoteController.text = '';
-    });
+    try {
+      setState(() {
+        _scale = AppConstants.defaultScale;
+        _customQuote = '';
+        _quoteController.text = '';
+      });
 
-    await _saveSettings();
+      await _saveSettings();
 
-    // Reset all preferences to defaults
-    await AppPreferences.setVerticalPosition(AppConstants.defaultVerticalPosition);
-    await AppPreferences.setHorizontalPosition(AppConstants.defaultHorizontalPosition);
-    await AppPreferences.setOpacity(1.0);
-    await AppPreferences.setPaddingTop(0.0);
-    await AppPreferences.setPaddingBottom(0.0);
-    await AppPreferences.setPaddingLeft(0.0);
-    await AppPreferences.setPaddingRight(0.0);
-    await AppPreferences.setCornerRadius(0.0);
-    await AppPreferences.setQuoteFontSize(14.0);
-    await AppPreferences.setQuoteOpacity(1.0);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('🔄 Settings reset to defaults'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      // Reset all preferences to defaults
+      await AppPreferences.setVerticalPosition(
+        AppConstants.defaultVerticalPosition,
       );
+      await AppPreferences.setHorizontalPosition(
+        AppConstants.defaultHorizontalPosition,
+      );
+      await AppPreferences.setOpacity(1.0);
+      await AppPreferences.setPaddingTop(0.0);
+      await AppPreferences.setPaddingBottom(0.0);
+      await AppPreferences.setPaddingLeft(0.0);
+      await AppPreferences.setPaddingRight(0.0);
+      await AppPreferences.setCornerRadius(0.0);
+      await AppPreferences.setQuoteFontSize(14.0);
+      await AppPreferences.setQuoteOpacity(1.0);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🔄 Settings reset to defaults'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('CustomizeScreen: Reset error: $e');
     }
   }
 
@@ -176,7 +211,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: context.surfaceColor,
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(AppTheme.radiusRound),
                     topRight: Radius.circular(AppTheme.radiusRound),
                   ),
@@ -216,7 +251,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
           ),
           IconButton(
             onPressed: _resetSettings,
-            icon: Icon(Icons.restart_alt_outlined),
+            icon: const Icon(Icons.restart_alt_outlined),
             tooltip: 'Reset to defaults',
             style: IconButton.styleFrom(
               backgroundColor: context.colorScheme.error.withOpacity(0.1),
@@ -238,7 +273,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
             color: context.colorScheme.onBackground.withOpacity(0.6),
           ),
         ),
-        SizedBox(height: AppTheme.spacing12),
+        const SizedBox(height: AppTheme.spacing12),
 
         // Phone Mockup
         Flexible(
@@ -256,7 +291,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
                     blurRadius: 20,
-                    offset: Offset(0, 10),
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
@@ -282,7 +317,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
               size: 48,
               color: context.colorScheme.onBackground.withOpacity(0.3),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'Sync data from Home first',
               style: TextStyle(
@@ -317,16 +352,20 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
 
   Widget _buildSimpleControls() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(AppTheme.spacing16),
+      padding: const EdgeInsets.all(AppTheme.spacing16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Scale slider
           Text('Size', style: context.textTheme.titleMedium),
-          SizedBox(height: AppTheme.spacing8),
+          const SizedBox(height: AppTheme.spacing8),
           Row(
             children: [
-              Icon(Icons.zoom_out, size: 20, color: context.colorScheme.onBackground.withOpacity(0.5)),
+              Icon(
+                Icons.zoom_out,
+                size: 20,
+                color: context.colorScheme.onBackground.withOpacity(0.5),
+              ),
               Expanded(
                 child: Slider(
                   value: _scale,
@@ -339,23 +378,30 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
                   onChangeEnd: (value) => _saveSettings(),
                 ),
               ),
-              Icon(Icons.zoom_in, size: 20, color: context.colorScheme.onBackground.withOpacity(0.5)),
+              Icon(
+                Icons.zoom_in,
+                size: 20,
+                color: context.colorScheme.onBackground.withOpacity(0.5),
+              ),
             ],
           ),
-          
-          SizedBox(height: AppTheme.spacing16),
+
+          const SizedBox(height: AppTheme.spacing16),
 
           // Quote input
           Text('Quote (optional)', style: context.textTheme.titleMedium),
-          SizedBox(height: AppTheme.spacing8),
+          const SizedBox(height: AppTheme.spacing8),
           TextField(
             controller: _quoteController,
             onChanged: (value) {
-              setState(() => _customQuote = value);
+              // ✅ IMPROVED: Trim whitespace and limit length
+              final trimmed = value.trim();
+              setState(() => _customQuote = trimmed);
               _saveSettings();
             },
             maxLines: 2,
-            maxLength: 80,
+            maxLength:
+                100, // ✅ Increased from 80 to match preferences.dart limit
             style: context.textTheme.bodyMedium,
             decoration: InputDecoration(
               hintText: 'Enter a motivational quote...',
@@ -365,11 +411,13 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
                 borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                 borderSide: BorderSide.none,
               ),
-              counterText: '',
+              counterStyle: context.textTheme.bodySmall?.copyWith(
+                color: context.colorScheme.onBackground.withOpacity(0.4),
+              ),
             ),
           ),
 
-          SizedBox(height: AppTheme.spacing16),
+          const SizedBox(height: AppTheme.spacing16),
 
           // Set Wallpaper Button
           SizedBox(
@@ -377,7 +425,7 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
             child: ElevatedButton.icon(
               onPressed: _isSettingWallpaper ? null : _setWallpaper,
               icon: _isSettingWallpaper
-                  ? SizedBox(
+                  ? const SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
@@ -385,10 +433,12 @@ class _CustomizeScreenState extends State<CustomizeScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                  : Icon(Icons.wallpaper_outlined),
+                  : const Icon(Icons.wallpaper_outlined),
               label: Text(_isSettingWallpaper ? 'Setting...' : 'Set Wallpaper'),
               style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: AppTheme.spacing16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppTheme.spacing16,
+                ),
               ),
             ),
           ),
