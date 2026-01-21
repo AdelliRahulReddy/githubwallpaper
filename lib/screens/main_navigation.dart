@@ -15,14 +15,16 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
+  // ✅ Screens list - const not possible here since screens have state
+  final List<Widget> _screens = const [
     HomeScreen(),
     CustomizeScreen(),
     StatsScreen(),
     SettingsScreen(),
   ];
 
-  final List<NavigationItem> _navItems = [
+  // ✅ IMPROVED: Made nav items const
+  final List<NavigationItem> _navItems = const [
     NavigationItem(
       icon: Icons.home_outlined,
       activeIcon: Icons.home,
@@ -56,13 +58,13 @@ class _MainNavigationState extends State<MainNavigation> {
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
-              offset: Offset(0, -5),
+              offset: const Offset(0, -5),
             ),
           ],
         ),
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.symmetric(
+            padding: const EdgeInsets.symmetric(
               horizontal: AppTheme.spacing8,
               vertical: AppTheme.spacing8,
             ),
@@ -89,7 +91,7 @@ class _MainNavigationState extends State<MainNavigation> {
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
         child: AnimatedContainer(
           duration: AppTheme.durationFast,
-          padding: EdgeInsets.symmetric(vertical: AppTheme.spacing12),
+          padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing12),
           decoration: BoxDecoration(
             color: isActive
                 ? context.primaryColor.withOpacity(0.1)
@@ -106,7 +108,7 @@ class _MainNavigationState extends State<MainNavigation> {
                     : context.colorScheme.onBackground.withOpacity(0.5),
                 size: 24,
               ),
-              SizedBox(height: AppTheme.spacing4),
+              const SizedBox(height: AppTheme.spacing4),
               Text(
                 item.label,
                 style: context.textTheme.labelSmall?.copyWith(
@@ -129,7 +131,7 @@ class NavigationItem {
   final IconData activeIcon;
   final String label;
 
-  NavigationItem({
+  const NavigationItem({
     required this.icon,
     required this.activeIcon,
     required this.label,
