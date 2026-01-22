@@ -127,7 +127,7 @@ class HeatmapPainter extends CustomPainter {
     // Layout sections - Measure actual heights
     final headerPainter = _getHeaderPainter(heatmapWidth, cellSize, safeOpacity);
     final headerHeight = headerPainter.height;
-    final headerGap = cellSize * 0.8;
+    final headerGap = cellSize * 1.5; // ✅ INCREASED: from 0.8 to 1.5 to prevent collapsing
 
     final statsHeight = _getStatsHeight(heatmapWidth, cellSize);
     final statsGap = cellSize * 0.5;
@@ -419,16 +419,31 @@ class HeatmapPainter extends CustomPainter {
 
   /// ✅ GitHub contribution color scale (darker = more contributions)
   Color _getContributionColor(int contributions) {
-    if (contributions == 0) {
-      return isDarkMode ? const Color(0xFF161B22) : const Color(0xFFEBEDF0);
-    } else if (contributions <= 3) {
-      return const Color(0xFF0E4429); // Darkest (low activity)
-    } else if (contributions <= 6) {
-      return const Color(0xFF006D32); // Dark
-    } else if (contributions <= 9) {
-      return const Color(0xFF26A641); // Medium
+    if (isDarkMode) {
+      if (contributions == 0) {
+        return const Color(0xFF161B22);
+      } else if (contributions <= 3) {
+        return const Color(0xFF0E4429);
+      } else if (contributions <= 6) {
+        return const Color(0xFF006D32);
+      } else if (contributions <= 9) {
+        return const Color(0xFF26A641);
+      } else {
+        return const Color(0xFF39D353);
+      }
     } else {
-      return const Color(0xFF39D353); // Brightest (high activity)
+      // Light Mode (GitHub standard light green scale)
+      if (contributions == 0) {
+        return const Color(0xFFEBEDF0);
+      } else if (contributions <= 3) {
+        return const Color(0xFF9BE9A8);
+      } else if (contributions <= 6) {
+        return const Color(0xFF40C463);
+      } else if (contributions <= 9) {
+        return const Color(0xFF30A14E);
+      } else {
+        return const Color(0xFF216E39);
+      }
     }
   }
 

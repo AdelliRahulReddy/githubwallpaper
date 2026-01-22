@@ -227,6 +227,7 @@ class GitHubAPI {
     int longestStreak = 0;
     int todayCommits = 0;
     int tempStreak = 0;
+    int streakAtLastContribution = 0;
 
     // Sort days by date
     final sortedDays = List<ContributionDay>.from(days);
@@ -247,6 +248,7 @@ class GitHubAPI {
       if (day.contributionCount > 0) {
         tempStreak++;
         lastContributionDate = day.date;
+        streakAtLastContribution = tempStreak;
 
         // Update longest streak
         if (tempStreak > longestStreak) {
@@ -262,13 +264,14 @@ class GitHubAPI {
     // 1. Last contribution was today, OR
     // 2. Last contribution was yesterday (today might not be over yet)
     if (lastContributionDate != null) {
-      final daysSinceLastContribution = today
-          .difference(lastContributionDate)
-          .inDays;
+      final daysSinceLastContribution = AppDateUtils.daysBetween(
+        lastContributionDate,
+        today,
+      );
 
       if (daysSinceLastContribution <= 1) {
         // Streak is still active (contributed today or yesterday)
-        currentStreak = tempStreak;
+        currentStreak = streakAtLastContribution;
       } else {
         // Streak is broken (more than 1 day since last contribution)
         currentStreak = 0;
