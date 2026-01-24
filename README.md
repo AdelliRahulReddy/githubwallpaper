@@ -22,7 +22,7 @@ Stay motivated by seeing your coding streak every time you unlock your phone!
 
 | Home Screen | Customize | Lock Screen |
 |-------------|-----------|-------------|
-| Live preview of your contribution graph | Adjust size and add quotes | Your wallpaper in action |
+| Live preview of your contribution graph | Adjust size and add quotes | Your wallpaper in action
 
 ---
 
