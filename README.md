@@ -10,7 +10,7 @@ Turn your GitHub contribution graph into a live, auto-updating wallpaper on your
 
 GitHub Wallpaper is a Flutter app that:
 - Fetches your **monthly GitHub contribution data**
-- Displays it as a beautiful **calendar heatmap**
+- Displays it as a beautiful calendar heatmap
 - Sets it as your **lock screen and home screen wallpaper**
 - **Auto-updates every 4 hours** in the background
 
